@@ -15,18 +15,48 @@ interface InputImageGridProps {
   phase: 'convolution' | 'pooling';
   highlightRegion?: { row: number; col: number } | null;
   convolutionHighlight?: ConvolutionHighlight | null; // Advanced highlight with dominant cell
+  // NEW: Padding support
+  padding: number;
+  stride: number;
+  paddedInputSize: number;
+  originalInputSize: number;
 }
 
-export function InputImageGrid({ image, currentStep, phase, highlightRegion, convolutionHighlight }: InputImageGridProps) {
+export function InputImageGrid({ 
+  image, 
+  currentStep, 
+  phase, 
+  highlightRegion, 
+  convolutionHighlight,
+  padding,
+  stride,
+  paddedInputSize,
+  originalInputSize 
+}: InputImageGridProps) {
+  // Check if a cell is a padding cell (outside the original 28x28 region)
+  const isPaddingCell = (row: number, col: number): boolean => {
+    if (padding === 0) return false;
+    // Padding cells are those in the padding border region
+    return (
+      row < padding || 
+      row >= padding + originalInputSize || 
+      col < padding || 
+      col >= padding + originalInputSize
+    );
+  };
+
   // Highlighted region for interactive feature - now uses convolutionHighlight primarily
+  // Updated to use stride when calculating input window position
   const highlightedCells = useMemo(() => {
     // Priority 1: Use convolutionHighlight from feature map hover (works in any phase)
     if (convolutionHighlight) {
       const cells = new Set<string>();
-      const { inputWindow } = convolutionHighlight;
+      // Calculate input window position using stride
+      const startRow = convolutionHighlight.featureMapRow * stride;
+      const startCol = convolutionHighlight.featureMapCol * stride;
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-          cells.add(`${inputWindow.row + i}-${inputWindow.col + j}`);
+          cells.add(`${startRow + i}-${startCol + j}`);
         }
       }
       return cells;
@@ -35,9 +65,11 @@ export function InputImageGrid({ image, currentStep, phase, highlightRegion, con
     // Priority 2: Use highlightRegion if provided
     if (highlightRegion) {
       const cells = new Set<string>();
+      const startRow = highlightRegion.row * stride;
+      const startCol = highlightRegion.col * stride;
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-          cells.add(`${highlightRegion.row + i}-${highlightRegion.col + j}`);
+          cells.add(`${startRow + i}-${startCol + j}`);
         }
       }
       return cells;
@@ -46,22 +78,30 @@ export function InputImageGrid({ image, currentStep, phase, highlightRegion, con
     // Priority 3: Fallback to currentStep during convolution phase
     if (currentStep && phase === 'convolution') {
       const cells = new Set<string>();
+      const startRow = currentStep.row * stride;
+      const startCol = currentStep.col * stride;
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-          cells.add(`${currentStep.row + i}-${currentStep.col + j}`);
+          cells.add(`${startRow + i}-${startCol + j}`);
         }
       }
       return cells;
     }
     
     return new Set<string>();
-  }, [convolutionHighlight, highlightRegion, currentStep, phase]);
+  }, [convolutionHighlight, highlightRegion, currentStep, phase, stride]);
 
   // Check if a cell is the DOMINANT contributing cell
   const isDominantCell = (row: number, col: number): boolean => {
     if (!convolutionHighlight) return false;
+    // Recalculate dominant position considering stride
+    const startRow = convolutionHighlight.featureMapRow * stride;
+    const startCol = convolutionHighlight.featureMapCol * stride;
     const { dominantCellPosition } = convolutionHighlight;
-    return row === dominantCellPosition.row && col === dominantCellPosition.col;
+    // Adjust dominant cell position if we're using stride
+    const adjustedDominantRow = startRow + (dominantCellPosition.row - convolutionHighlight.inputWindow.row);
+    const adjustedDominantCol = startCol + (dominantCellPosition.col - convolutionHighlight.inputWindow.col);
+    return row === adjustedDominantRow && col === adjustedDominantCol;
   };
 
   // Get contrasting text color based on background brightness
@@ -69,18 +109,29 @@ export function InputImageGrid({ image, currentStep, phase, highlightRegion, con
     return grayValue > 127 ? '#000000' : '#ffffff';
   };
 
+  // Calculate cell size based on grid size (smaller cells for larger grids)
+  const cellSize = paddedInputSize <= 28 ? 14 : paddedInputSize <= 30 ? 12 : 11;
+
   return (
     <div className="bg-card rounded-lg border border-border shadow-sm p-2">
-      <h3 className="text-sm font-semibold text-foreground mb-1">Input Image (28×28)</h3>
+      <h3 className="text-sm font-semibold text-foreground mb-1">
+        Input Image ({paddedInputSize}×{paddedInputSize})
+        {padding > 0 && (
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            (28×28 + padding={padding})
+          </span>
+        )}
+      </h3>
       <p className="text-xs text-muted-foreground mb-2">
-        Each cell represents one MNIST pixel.
+        Each cell represents one pixel.
+        {padding > 0 && " Dashed border = padding pixels (value 0)."}
       </p>
       
       <div className="flex justify-center overflow-auto">
         <div 
           className="inline-grid bg-border"
           style={{ 
-            gridTemplateColumns: `repeat(28, 14px)`,
+            gridTemplateColumns: `repeat(${paddedInputSize}, ${cellSize}px)`,
             gap: '1px',
             padding: '1px',
           }}
@@ -90,20 +141,31 @@ export function InputImageGrid({ image, currentStep, phase, highlightRegion, con
               const key = `${rowIdx}-${colIdx}`;
               const isHighlighted = highlightedCells.has(key);
               const isDominant = isDominantCell(rowIdx, colIdx);
+              const isPadding = isPaddingCell(rowIdx, colIdx);
               const grayValue = Math.round(pixel);
               const textColor = getTextColor(grayValue);
               
               // Determine cell styling
               let cellStyle: React.CSSProperties = {
-                width: '14px',
-                height: '14px',
+                width: `${cellSize}px`,
+                height: `${cellSize}px`,
                 backgroundColor: `rgb(${grayValue}, ${grayValue}, ${grayValue})`,
                 color: textColor,
-                fontSize: '5px',
+                fontSize: cellSize <= 12 ? '4px' : '5px',
                 fontFamily: 'monospace',
                 fontWeight: 600,
                 lineHeight: 1,
               };
+
+              // If this is a padding cell, show distinctive style
+              if (isPadding) {
+                cellStyle = {
+                  ...cellStyle,
+                  backgroundColor: '#f0f4f8', // Light neutral background
+                  color: '#94a3b8', // Muted text color
+                  border: '1px dashed #cbd5e1', // Dashed border to indicate padding
+                };
+              }
 
               // If this is the DOMINANT contributing cell, highlight prominently
               if (isDominant) {
@@ -118,7 +180,7 @@ export function InputImageGrid({ image, currentStep, phase, highlightRegion, con
                 // Part of 3x3 window - show with yellow tint overlay
                 cellStyle = {
                   ...cellStyle,
-                  backgroundColor: `rgba(255, 235, 59, 0.7)`, // Yellow overlay
+                  backgroundColor: isPadding ? 'rgba(255, 235, 59, 0.5)' : 'rgba(255, 235, 59, 0.7)', // Yellow overlay
                   color: '#000000',
                   border: '1px solid #FFC107',
                   fontWeight: 700,
@@ -142,7 +204,7 @@ export function InputImageGrid({ image, currentStep, phase, highlightRegion, con
       </div>
       
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 text-xs mt-2">
+      <div className="flex items-center justify-center gap-4 text-xs mt-2 flex-wrap">
         <div className="flex items-center gap-1">
           <div 
             className="w-4 h-4 border border-border flex items-center justify-center text-white font-mono"
@@ -170,6 +232,22 @@ export function InputImageGrid({ image, currentStep, phase, highlightRegion, con
           </div>
           <span className="text-muted-foreground">White</span>
         </div>
+        {padding > 0 && (
+          <div className="flex items-center gap-1">
+            <div 
+              className="w-4 h-4 flex items-center justify-center font-mono"
+              style={{ 
+                backgroundColor: '#f0f4f8', 
+                border: '1px dashed #cbd5e1',
+                color: '#94a3b8',
+                fontSize: '6px' 
+              }}
+            >
+              0
+            </div>
+            <span className="text-muted-foreground">Padding</span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -35,6 +35,13 @@ const Index = () => {
     step,
     togglePlay,
     reset,
+    // NEW: Padding and Stride
+    padding,
+    setPadding,
+    stride,
+    setStride,
+    paddedInputSize,
+    originalInputSize,
   } = useCNNVisualization();
 
   // --- INTERACTIVE FEATURE: Highlight input region on feature map hover ---
@@ -61,20 +68,24 @@ const Index = () => {
   const handleFeatureMapCellHover = (fmRow: number, fmCol: number) => {
     setHighlightInputRegion({ row: fmRow, col: fmCol });
 
+    // Calculate starting position in the input using stride
+    const inputRowStart = fmRow * stride;
+    const inputColStart = fmCol * stride;
+
     // Extract 3x3 input window
     const inputWindow: number[][] = [];
     const multiplications: number[][] = [];
     let sum = 0;
     let maxContribution = -Infinity;
-    let dominantRow = fmRow;
-    let dominantCol = fmCol;
+    let dominantRow = inputRowStart;
+    let dominantCol = inputColStart;
 
     for (let i = 0; i < 3; i++) {
       const inputRow: number[] = [];
       const multRow: number[] = [];
       for (let j = 0; j < 3; j++) {
-        const pixelRow = fmRow + i;
-        const pixelCol = fmCol + j;
+        const pixelRow = inputRowStart + i;
+        const pixelCol = inputColStart + j;
         const pixelVal = inputImage[pixelRow]?.[pixelCol] ?? 0;
         const filterVal = filter[i][j];
         const mult = pixelVal * filterVal;
@@ -106,7 +117,7 @@ const Index = () => {
     setConvolutionHighlight({
       featureMapRow: fmRow,
       featureMapCol: fmCol,
-      inputWindow: { row: fmRow, col: fmCol },
+      inputWindow: { row: inputRowStart, col: inputColStart },
       dominantCellPosition: { row: dominantRow, col: dominantCol },
     });
   };
@@ -221,6 +232,10 @@ const Index = () => {
           onStep={step}
           onTogglePlay={togglePlay}
           onReset={reset}
+          padding={padding}
+          onPaddingChange={setPadding}
+          stride={stride}
+          onStrideChange={setStride}
         />
 
         {/* Convolution Operation */}
@@ -242,6 +257,10 @@ const Index = () => {
             phase={phase}
             highlightRegion={highlightInputRegion}
             convolutionHighlight={convolutionHighlight}
+            padding={padding}
+            stride={stride}
+            paddedInputSize={paddedInputSize}
+            originalInputSize={originalInputSize}
           />
 
           {/* Feature Map */}
@@ -274,6 +293,10 @@ const Index = () => {
           convStep={convStep}
           poolStep={poolStep}
           isComplete={isComplete}
+          padding={padding}
+          stride={stride}
+          convOutputSize={convOutputSize}
+          poolOutputSize={poolOutputSize}
         />
 
         {/* Footer */}

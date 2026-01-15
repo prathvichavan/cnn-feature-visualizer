@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { mnistSamples, fashionMnistSamples, filters, FilterType, DatasetType } from '@/data/datasets';
 
 export interface ConvolutionStep {
@@ -30,31 +30,76 @@ export function useCNNVisualization() {
   const [currentConvStep, setCurrentConvStep] = useState<ConvolutionStep | null>(null);
   const [currentPoolStep, setCurrentPoolStep] = useState<PoolingStep | null>(null);
   
+  // NEW: Padding and Stride state
+  const [padding, setPadding] = useState<number>(0); // 0, 1, or 2
+  const [stride, setStride] = useState<number>(1);   // 1 or 2
+  
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Get input image based on selected class and dataset
-  const inputImage = dataset === 'mnist' ? mnistSamples[selectedClass] : fashionMnistSamples[selectedClass];
+  const originalInputImage = dataset === 'mnist' ? mnistSamples[selectedClass] : fashionMnistSamples[selectedClass];
   const filter = filters[filterType];
   
-  // Output dimensions for convolution (28 - 3 + 1 = 26)
-  const convOutputSize = 26;
-  // Output dimensions for pooling (26 / 2 = 13)
-  const poolOutputSize = 13;
+  // Original input size (MNIST is 28x28)
+  const originalInputSize = 28;
+  
+  // Padded input size: original + 2 * padding
+  const paddedInputSize = originalInputSize + 2 * padding;
+  
+  // Create padded input image (with zero padding around edges)
+  const inputImage = useMemo(() => {
+    if (padding === 0) {
+      return originalInputImage;
+    }
+    
+    // Create new padded array filled with zeros
+    const padded: number[][] = Array(paddedInputSize)
+      .fill(null)
+      .map(() => Array(paddedInputSize).fill(0));
+    
+    // Copy original image into the center
+    for (let i = 0; i < originalInputSize; i++) {
+      for (let j = 0; j < originalInputSize; j++) {
+        padded[padding + i][padding + j] = originalInputImage[i][j];
+      }
+    }
+    
+    return padded;
+  }, [originalInputImage, padding, paddedInputSize, originalInputSize]);
+  
+  // Kernel size (3x3 filter)
+  const kernelSize = 3;
+  
+  // Output dimensions for convolution using formula:
+  // Output size = floor((N - K + 2P) / S) + 1
+  // where N = input size, K = kernel size, P = padding, S = stride
+  const convOutputSize = Math.floor((originalInputSize - kernelSize + 2 * padding) / stride) + 1;
+  
+  // Output dimensions for pooling (2x2 pooling with stride 2)
+  // Pooling output = floor(convOutputSize / 2)
+  const poolOutputSize = Math.floor(convOutputSize / 2);
   
   const totalConvSteps = convOutputSize * convOutputSize;
   const totalPoolSteps = poolOutputSize * poolOutputSize;
 
   // Perform single convolution at position
+  // Note: row and col represent the OUTPUT position
+  // We need to calculate the input window position using stride
   const performConvolution = useCallback((row: number, col: number): ConvolutionStep => {
     const inputWindow: number[][] = [];
     const multiplications: number[][] = [];
     let sum = 0;
     
+    // Calculate starting position in the (padded) input image
+    // For stride > 1, we multiply the output position by stride
+    const inputRowStart = row * stride;
+    const inputColStart = col * stride;
+    
     for (let i = 0; i < 3; i++) {
       inputWindow[i] = [];
       multiplications[i] = [];
       for (let j = 0; j < 3; j++) {
-        const pixelValue = inputImage[row + i][col + j];
+        const pixelValue = inputImage[inputRowStart + i][inputColStart + j];
         const filterValue = filter[i][j];
         inputWindow[i][j] = pixelValue;
         multiplications[i][j] = pixelValue * filterValue;
@@ -63,7 +108,7 @@ export function useCNNVisualization() {
     }
     
     return { inputWindow, filterWindow: filter, multiplications, sum, row, col };
-  }, [inputImage, filter]);
+  }, [inputImage, filter, stride]);
 
   // Perform single pooling at position
   const performPooling = useCallback((row: number, col: number, fMap: number[][]): PoolingStep => {
@@ -98,10 +143,10 @@ export function useCNNVisualization() {
     }
   }, []);
 
-  // Reset when class or filter changes
+  // Reset when class, filter, padding, or stride changes
   useEffect(() => {
     reset();
-  }, [selectedClass, filterType, dataset, reset]);
+  }, [selectedClass, filterType, dataset, padding, stride, reset]);
 
   // Step forward
   const step = useCallback(() => {
@@ -217,6 +262,14 @@ export function useCNNVisualization() {
     totalPoolSteps,
     convOutputSize,
     poolOutputSize,
+    
+    // NEW: Padding and Stride state
+    padding,
+    setPadding,
+    stride,
+    setStride,
+    paddedInputSize,
+    originalInputSize,
     
     // Actions
     setSelectedClass,
