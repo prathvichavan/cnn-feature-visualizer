@@ -6,7 +6,7 @@ import { ConvolutionVisualization } from '@/components/ConvolutionVisualization'
 import { FeatureMapDisplay } from '@/components/FeatureMapDisplay';
 import { PoolingVisualization } from '@/components/PoolingVisualization';
 import { ExplanationPanel } from '@/components/ExplanationPanel';
-import { useCNNVisualization } from '@/hooks/useCNNVisualization';
+import { useCNNVisualization, PoolingType } from '@/hooks/useCNNVisualization';
 import { mnistClassLabels, fashionMnistClassLabels } from '@/data/datasets';
 
 const Index = () => {
@@ -42,6 +42,9 @@ const Index = () => {
     setStride,
     paddedInputSize,
     originalInputSize,
+    // NEW: Pooling type
+    poolingType,
+    setPoolingType,
   } = useCNNVisualization();
 
   // --- INTERACTIVE FEATURE: Highlight input region on feature map hover ---
@@ -135,6 +138,7 @@ const Index = () => {
     pooledCol: number;
     featureMapWindow: { row: number; col: number }; // top-left of 2x2 window
     maxCellPosition: { row: number; col: number }; // exact cell with max value
+    minCellPosition?: { row: number; col: number }; // exact cell with min value
   }>(null);
 
   // --- SELECTED POOLING STEP: Full step data for clicked pooled cell ---
@@ -143,19 +147,36 @@ const Index = () => {
     col: number;
     window: number[][];
     maxValue: number;
+    minValue?: number;
+    avgValue?: number;
+    resultValue: number;
+    poolingType: PoolingType;
+    maxCellPosition?: { i: number; j: number };
+    minCellPosition?: { i: number; j: number };
   } | null>(null);
 
   // Handler for when user clicks/hovers on a pooled cell
   const handlePooledCellSelect = (pooledRow: number, pooledCol: number) => {
+    // For global average pooling, don't allow cell selection (there's only one cell)
+    if (poolingType === 'globalAverage') {
+      return;
+    }
+
     // Calculate the corresponding 2x2 window in the feature map
     const convRowStart = pooledRow * 2; // stride = 2
     const convColStart = pooledCol * 2;
 
-    // Extract 2x2 window and find max
+    // Extract 2x2 window and find max/min
     const window: number[][] = [];
     let maxVal = -Infinity;
+    let minVal = Infinity;
+    let sum = 0;
     let maxRow = convRowStart;
     let maxCol = convColStart;
+    let minRow = convRowStart;
+    let minCol = convColStart;
+    let maxCellPosition = { i: 0, j: 0 };
+    let minCellPosition = { i: 0, j: 0 };
 
     for (let i = 0; i < 2; i++) {
       const windowRow: number[] = [];
@@ -164,13 +185,40 @@ const Index = () => {
         const c = convColStart + j;
         const val = displayFeatureMap[r]?.[c] ?? 0;
         windowRow.push(val);
+        sum += val;
+        
         if (val > maxVal) {
           maxVal = val;
           maxRow = r;
           maxCol = c;
+          maxCellPosition = { i, j };
+        }
+        if (val < minVal) {
+          minVal = val;
+          minRow = r;
+          minCol = c;
+          minCellPosition = { i, j };
         }
       }
       window.push(windowRow);
+    }
+
+    const avgVal = sum / 4;
+    
+    // Determine result value based on current pooling type
+    let resultValue: number;
+    switch (poolingType) {
+      case 'max':
+        resultValue = maxVal;
+        break;
+      case 'min':
+        resultValue = minVal;
+        break;
+      case 'average':
+        resultValue = avgVal;
+        break;
+      default:
+        resultValue = maxVal;
     }
 
     // Set the selected pooling step with full window data
@@ -179,13 +227,22 @@ const Index = () => {
       col: pooledCol,
       window,
       maxValue: maxVal,
+      minValue: minVal,
+      avgValue: avgVal,
+      resultValue,
+      poolingType,
+      maxCellPosition,
+      minCellPosition,
     });
 
     setPoolingHighlight({
       pooledRow,
       pooledCol,
       featureMapWindow: { row: convRowStart, col: convColStart },
-      maxCellPosition: { row: maxRow, col: maxCol },
+      maxCellPosition: poolingType === 'max' ? { row: maxRow, col: maxCol } : 
+                       poolingType === 'min' ? { row: minRow, col: minCol } :
+                       { row: convRowStart, col: convColStart }, // For average, highlight whole window
+      minCellPosition: { row: minRow, col: minCol },
     });
   };
 
@@ -281,6 +338,8 @@ const Index = () => {
           totalSteps={totalPoolSteps}
           size={poolOutputSize}
           phase={phase}
+          poolingType={poolingType}
+          onPoolingTypeChange={setPoolingType}
           onPooledCellHover={handlePooledCellSelect}
           onPooledCellLeave={clearPoolingHighlight}
           selectedPooledCell={poolingHighlight ? { row: poolingHighlight.pooledRow, col: poolingHighlight.pooledCol } : null}

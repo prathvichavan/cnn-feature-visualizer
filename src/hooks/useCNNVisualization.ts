@@ -1,6 +1,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { mnistSamples, fashionMnistSamples, filters, FilterType, DatasetType } from '@/data/datasets';
 
+// Pooling type options
+export type PoolingType = 'max' | 'min' | 'average' | 'globalAverage';
+
 export interface ConvolutionStep {
   inputWindow: number[][];
   filterWindow: number[][];
@@ -12,9 +15,17 @@ export interface ConvolutionStep {
 
 export interface PoolingStep {
   window: number[][];
-  maxValue: number;
+  maxValue: number;      // Used for max pooling
+  minValue?: number;     // Used for min pooling
+  avgValue?: number;     // Used for average pooling
+  resultValue: number;   // The actual pooled result (max, min, or average)
   row: number;
   col: number;
+  poolingType: PoolingType;
+  // For min pooling: position of the min cell within the 2x2 window
+  minCellPosition?: { i: number; j: number };
+  // For max pooling: position of the max cell within the 2x2 window
+  maxCellPosition?: { i: number; j: number };
 }
 
 export function useCNNVisualization() {
@@ -33,6 +44,9 @@ export function useCNNVisualization() {
   // NEW: Padding and Stride state
   const [padding, setPadding] = useState<number>(0); // 0, 1, or 2
   const [stride, setStride] = useState<number>(1);   // 1 or 2
+  
+  // NEW: Pooling type state
+  const [poolingType, setPoolingType] = useState<PoolingType>('max');
   
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -110,21 +124,82 @@ export function useCNNVisualization() {
     return { inputWindow, filterWindow: filter, multiplications, sum, row, col };
   }, [inputImage, filter, stride]);
 
-  // Perform single pooling at position
-  const performPooling = useCallback((row: number, col: number, fMap: number[][]): PoolingStep => {
+  // Perform single pooling at position - supports max, min, average, globalAverage
+  const performPooling = useCallback((row: number, col: number, fMap: number[][], type: PoolingType): PoolingStep => {
     const window: number[][] = [];
     let maxValue = -Infinity;
+    let minValue = Infinity;
+    let sum = 0;
+    let maxCellPosition = { i: 0, j: 0 };
+    let minCellPosition = { i: 0, j: 0 };
     
     for (let i = 0; i < 2; i++) {
       window[i] = [];
       for (let j = 0; j < 2; j++) {
         const value = fMap[row * 2 + i][col * 2 + j];
         window[i][j] = value;
-        maxValue = Math.max(maxValue, value);
+        sum += value;
+        
+        if (value > maxValue) {
+          maxValue = value;
+          maxCellPosition = { i, j };
+        }
+        if (value < minValue) {
+          minValue = value;
+          minCellPosition = { i, j };
+        }
       }
     }
     
-    return { window, maxValue, row, col };
+    const avgValue = sum / 4;
+    
+    // Determine the result value based on pooling type
+    let resultValue: number;
+    switch (type) {
+      case 'max':
+        resultValue = maxValue;
+        break;
+      case 'min':
+        resultValue = minValue;
+        break;
+      case 'average':
+        resultValue = avgValue;
+        break;
+      case 'globalAverage':
+        // For global average, this is calculated separately
+        resultValue = avgValue;
+        break;
+      default:
+        resultValue = maxValue;
+    }
+    
+    return {
+      window,
+      maxValue,
+      minValue,
+      avgValue,
+      resultValue,
+      row,
+      col,
+      poolingType: type,
+      maxCellPosition,
+      minCellPosition,
+    };
+  }, []);
+  
+  // Perform global average pooling - computes the average of the entire feature map
+  const performGlobalAveragePooling = useCallback((fMap: number[][]): number => {
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < fMap.length; i++) {
+      for (let j = 0; j < fMap[i].length; j++) {
+        if (fMap[i][j] !== null) {
+          sum += fMap[i][j];
+          count++;
+        }
+      }
+    }
+    return count > 0 ? sum / count : 0;
   }, []);
 
   // Initialize/reset
@@ -147,6 +222,26 @@ export function useCNNVisualization() {
   useEffect(() => {
     reset();
   }, [selectedClass, filterType, dataset, padding, stride, reset]);
+
+  // Reset pooling when pooling type changes (but keep convolution results)
+  const resetPooling = useCallback(() => {
+    setPoolStep(0);
+    setPooledMap([]);
+    setCurrentPoolStep(null);
+    if (phase === 'pooling') {
+      // Stay in pooling phase but reset its state
+    }
+    setIsPlaying(false);
+    if (playIntervalRef.current) {
+      clearInterval(playIntervalRef.current);
+      playIntervalRef.current = null;
+    }
+  }, [phase]);
+
+  // Reset pooling when pooling type changes
+  useEffect(() => {
+    resetPooling();
+  }, [poolingType, resetPooling]);
 
   // Step forward
   const step = useCallback(() => {
@@ -176,6 +271,41 @@ export function useCNNVisualization() {
         setPhase('pooling');
       }
     } else {
+      // Handle Global Average Pooling separately - it's a single step
+      if (poolingType === 'globalAverage') {
+        if (poolStep >= 1) {
+          setIsPlaying(false);
+          return;
+        }
+        
+        // Use complete feature map for pooling
+        const completeFeatureMap = featureMap.length > 0 ? featureMap : 
+          Array(convOutputSize).fill(null).map((_, r) => 
+            Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
+          );
+        
+        const globalAvg = performGlobalAveragePooling(completeFeatureMap);
+        
+        // Create a special pooling step for global average
+        const stepResult: PoolingStep = {
+          window: completeFeatureMap, // The entire feature map is the window
+          maxValue: Math.max(...completeFeatureMap.flat()),
+          minValue: Math.min(...completeFeatureMap.flat()),
+          avgValue: globalAvg,
+          resultValue: globalAvg,
+          row: 0,
+          col: 0,
+          poolingType: 'globalAverage',
+        };
+        
+        setCurrentPoolStep(stepResult);
+        setPooledMap([[globalAvg]]); // 1x1 output
+        setPoolStep(1);
+        setIsPlaying(false);
+        return;
+      }
+      
+      // Standard pooling (max, min, average)
       if (poolStep >= totalPoolSteps) {
         setIsPlaying(false);
         return;
@@ -190,14 +320,14 @@ export function useCNNVisualization() {
           Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
         );
       
-      const stepResult = performPooling(row, col, completeFeatureMap);
+      const stepResult = performPooling(row, col, completeFeatureMap, poolingType);
       
       setCurrentPoolStep(stepResult);
       setPooledMap(prev => {
         const newMap = prev.length === 0 
           ? Array(poolOutputSize).fill(null).map(() => Array(poolOutputSize).fill(null))
           : prev.map(r => [...r]);
-        newMap[row][col] = stepResult.maxValue;
+        newMap[row][col] = stepResult.resultValue;
         return newMap;
       });
       
@@ -208,7 +338,7 @@ export function useCNNVisualization() {
       }
     }
   }, [phase, convStep, poolStep, totalConvSteps, totalPoolSteps, convOutputSize, poolOutputSize, 
-      performConvolution, performPooling, featureMap]);
+      performConvolution, performPooling, performGlobalAveragePooling, featureMap, poolingType]);
 
   // Play/pause animation
   const togglePlay = useCallback(() => {
@@ -238,8 +368,10 @@ export function useCNNVisualization() {
     };
   }, [isPlaying, step]);
 
-  // Check if complete
-  const isComplete = phase === 'pooling' && poolStep >= totalPoolSteps;
+  // Check if complete - handle global average pooling separately (only 1 step)
+  const isComplete = phase === 'pooling' && (
+    poolingType === 'globalAverage' ? poolStep >= 1 : poolStep >= totalPoolSteps
+  );
 
   return {
     // State
@@ -270,6 +402,10 @@ export function useCNNVisualization() {
     setStride,
     paddedInputSize,
     originalInputSize,
+    
+    // NEW: Pooling type state
+    poolingType,
+    setPoolingType,
     
     // Actions
     setSelectedClass,
