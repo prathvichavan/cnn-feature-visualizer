@@ -4,7 +4,7 @@ export function Header() {
       <div className="max-w-6xl mx-auto px-3 py-2">
         <div className="flex items-center gap-2">
           <img 
-            src="/favicon.ico.png" 
+            src={`${import.meta.env.BASE_URL}favicon.ico.png`}
             alt="TechProjectHub Logo" 
             className="h-10 w-auto"
           />

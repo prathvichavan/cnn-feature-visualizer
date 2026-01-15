@@ -671,7 +671,7 @@ export const filters = {
   leftEdge: [
     [-1, 1, 0],
     [-1, 1, 0],
-    [1, 1, 0]
+    [-1, 1, 0]
   ],
   rightEdge: [
     [0, 1, -1],

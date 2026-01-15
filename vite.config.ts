@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === 'production' ? '/cnn-feature-visualizer/' : '/',
+  base: '/cnn-feature-visualizer/',
   server: {
     host: "::",
     port: 8080,
