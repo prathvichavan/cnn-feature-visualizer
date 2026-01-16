@@ -569,6 +569,14 @@ export function DenseLayerVisualization({
                     <div className="font-mono text-lg font-semibold text-green-600">
                       {formatValue(activatedOutputs[selectedNeuron], 4)}
                     </div>
+                    {/* Softmax explanatory note */}
+                    {denseActivationType === 'softmax' && (
+                      <p className="mt-2 text-xs text-muted-foreground italic leading-relaxed">
+                        Softmax is computed across <strong>all</strong> output neurons.
+                        This value represents the probability of the selected neuron
+                        relative to the other neurons.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -638,6 +646,83 @@ export function DenseLayerVisualization({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Softmax Context: Logits vs Probabilities Table */}
+        {isDenseComplete && denseActivationType === 'softmax' && (
+          <div className="space-y-2 pt-2 border-t border-border">
+            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+              <span>Softmax Context (All Output Neurons)</span>
+              <span className="text-xs font-normal text-muted-foreground">— vector-level operation</span>
+            </h4>
+            <p className="text-xs text-muted-foreground mb-2">
+              Softmax converts raw logits (z) into probabilities (p) using: 
+              <span className="font-mono ml-1">p_i = e^(z_i) / Σ e^(z_j)</span>
+            </p>
+            <div className="bg-muted/20 rounded-lg border border-border overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-muted/40 border-b border-border">
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Neuron</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Logit (z)</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Probability (p)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {neuronOutputs.map((logit, idx) => {
+                    const prob = activatedOutputs[idx];
+                    const isSelected = idx === selectedNeuron;
+                    return (
+                      <tr 
+                        key={idx} 
+                        className={`border-b border-border/50 cursor-pointer hover:bg-muted/30 transition-colors ${
+                          isSelected ? 'bg-orange-50 dark:bg-orange-950/30' : ''
+                        }`}
+                        onClick={() => onSelectedNeuronChange(idx)}
+                      >
+                        <td className="px-3 py-1.5">
+                          <span className={`font-medium ${isSelected ? 'text-orange-600' : 'text-foreground'}`}>
+                            Neuron {idx + 1}
+                            {isSelected && <span className="ml-1 text-[10px]">← selected</span>}
+                          </span>
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-mono text-muted-foreground">
+                          {formatValue(logit, 4)}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <span className={`font-mono font-semibold ${
+                            isSelected ? 'text-orange-600' : 'text-green-600'
+                          }`}>
+                            {prob !== null && prob !== undefined 
+                              ? (prob < 0.0001 && prob > 0 
+                                  ? prob.toExponential(2) 
+                                  : (prob * 100).toFixed(2) + '%')
+                              : '-'
+                            }
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-muted/40">
+                    <td className="px-3 py-2 font-medium text-muted-foreground">Total</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold text-foreground">
+                      {activatedOutputs.filter(v => v !== null).length > 0 
+                        ? '100.00%' 
+                        : '-'
+                      }
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground italic">
+              All probabilities sum to 1 (100%). Click any row to inspect that neuron's computation.
+            </p>
           </div>
         )}
 
