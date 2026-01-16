@@ -69,10 +69,21 @@ const Index = () => {
     stepPooling,
     togglePoolingPlay,
     resetPooling,
+    // NEW: Phase control functions
+    startActivation,
+    startPooling,
+    // NEW: Status indicators
+    convolutionStatus,
+    activationStatus,
+    poolingStatus,
+    isConvolutionComplete,
   } = useCNNVisualization();
 
   // --- INTERACTIVE FEATURE: Highlight input region on feature map hover ---
   const [highlightInputRegion, setHighlightInputRegion] = useState<null | {row: number, col: number}>(null);
+
+  // --- ACTIVATION HOVER: Highlight corresponding feature map cell ---
+  const [activationHighlight, setActivationHighlight] = useState<null | {row: number, col: number}>(null);
 
   // --- ADVANCED CONVOLUTION INTERACTION: Track the dominant contributing pixel ---
   const [convolutionHighlight, setConvolutionHighlight] = useState<null | {
@@ -361,14 +372,15 @@ const Index = () => {
             onCellHover={handleFeatureMapCellHover}
             onCellLeave={clearConvolutionHighlight}
             poolingHighlight={poolingHighlight}
+            activationHighlight={activationHighlight}
           />
         </div>
 
         {/* Activation Function - Between Feature Map and Pooling */}
         <ActivationVisualization
           featureMap={displayFeatureMap}
-          activatedMap={activatedFeatureMap.length > 0 
-            ? activatedFeatureMap 
+          activatedMap={displayedActivationMap.length > 0 
+            ? displayedActivationMap 
             : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
           size={convOutputSize}
           activationType={activationType}
@@ -383,6 +395,19 @@ const Index = () => {
           isActivationComplete={isActivationComplete}
           activationStep={activationStep}
           totalActivationSteps={totalActivationSteps}
+          status={activationStatus}
+          isConvolutionComplete={isConvolutionComplete}
+          onStartActivation={startActivation}
+          onActivatedCellHover={(row, col) => {
+            setActivationHighlight({ row, col });
+            // Also highlight the corresponding input region
+            handleFeatureMapCellHover(row, col);
+          }}
+          onActivatedCellLeave={() => {
+            setActivationHighlight(null);
+            clearConvolutionHighlight();
+          }}
+          stride={stride}
         />
 
         {/* Pooling Operation */}
@@ -404,6 +429,9 @@ const Index = () => {
           onPooledCellLeave={clearPoolingHighlight}
           selectedPooledCell={poolingHighlight ? { row: poolingHighlight.pooledRow, col: poolingHighlight.pooledCol } : null}
           isInteractive={!!selectedPoolStep}
+          status={poolingStatus}
+          isConvolutionComplete={isConvolutionComplete}
+          onStartPooling={startPooling}
         />
 
         {/* Explanation Panel */}

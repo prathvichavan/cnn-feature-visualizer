@@ -18,13 +18,16 @@ const POOLING_TYPE_DESCRIPTIONS: Record<PoolingType, string> = {
   globalAverage: 'Summarizes the entire feature map into a single value.',
 };
 
+// Status type for display
+type StageStatus = 'waiting' | 'running' | 'completed';
+
 interface PoolingVisualizationProps {
   currentStep: PoolingStep | null;
   pooledMap: number[][];
   poolStep: number;
   totalSteps: number;
   size: number;
-  phase: 'convolution' | 'pooling';
+  phase: 'convolution' | 'activation' | 'pooling';
   // Pooling type controls
   poolingType: PoolingType;
   onPoolingTypeChange: (type: PoolingType) => void;
@@ -39,6 +42,12 @@ interface PoolingVisualizationProps {
   onPooledCellLeave?: () => void;
   selectedPooledCell?: { row: number; col: number } | null;
   isInteractive?: boolean; // True when showing user-selected cell
+  // NEW: Status indicator
+  status: StageStatus;
+  // NEW: Convolution complete check (to enable pooling at any time)
+  isConvolutionComplete: boolean;
+  // NEW: Function to start pooling phase
+  onStartPooling: () => void;
 }
 
 export function PoolingVisualization({
@@ -59,6 +68,9 @@ export function PoolingVisualization({
   onPooledCellLeave,
   selectedPooledCell,
   isInteractive = false,
+  status,
+  isConvolutionComplete,
+  onStartPooling,
 }: PoolingVisualizationProps) {
   const { minVal, maxVal } = useMemo(() => {
     let min = 0;
@@ -181,14 +193,34 @@ export function PoolingVisualization({
     }
   };
 
+  // Get status badge styling
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'waiting':
+        return { text: 'Waiting', className: 'bg-gray-100 text-gray-600' };
+      case 'running':
+        return { text: 'Running', className: 'bg-blue-100 text-blue-600 animate-pulse' };
+      case 'completed':
+        return { text: 'Completed', className: 'bg-green-100 text-green-600' };
+    }
+  };
+
+  const statusBadge = getStatusBadge();
+
+  // Can we run pooling controls?
+  const canRunPooling = isConvolutionComplete && phase === 'pooling';
+
   return (
     <div className={`bg-card rounded-lg border shadow-sm p-2 ${isInteractive ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-border'}`}>
-      {/* Header with pooling type selector */}
+      {/* Header with pooling type selector and status */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-sm font-semibold text-foreground">
             {POOLING_TYPE_LABELS[poolingType]} {poolingType !== 'globalAverage' ? '(2×2)' : ''}
           </h3>
+          <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${statusBadge.className}`}>
+            {statusBadge.text}
+          </span>
           {isInteractive && currentStep && (
             <span className="px-2 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 rounded-full">
               📍 Selected Cell ({currentStep.row}, {currentStep.col})
@@ -200,6 +232,25 @@ export function PoolingVisualization({
         </span>
       </div>
 
+      {/* Start Pooling Button (shown when convolution is complete but pooling hasn't started) */}
+      {isConvolutionComplete && phase !== 'pooling' && poolStep === 0 && (
+        <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-green-700">Pooling can be applied on raw or activated feature map.</p>
+            <Button
+              onClick={onStartPooling}
+              variant="default"
+              size="sm"
+              className="h-7 px-3 text-xs flex items-center gap-1 bg-green-500 hover:bg-green-600"
+              title="Start pooling phase"
+            >
+              <Play className="w-3 h-3" />
+              Start Pooling
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Pooling Type Control Panel */}
       <div className="mb-3 p-2 bg-secondary/50 rounded-lg border border-border">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -208,22 +259,22 @@ export function PoolingVisualization({
           <div className="flex gap-1">
             <Button
               onClick={onStep}
-              disabled={isPlaying || isPoolingComplete || phase !== 'pooling'}
+              disabled={isPlaying || isPoolingComplete || !canRunPooling}
               variant="outline"
               size="sm"
               className="h-7 px-2 text-xs flex items-center gap-1"
-              title={phase !== 'pooling' ? 'Complete convolution first' : 'Step through pooling'}
+              title={!canRunPooling ? 'Start pooling first' : 'Step through pooling'}
             >
               <StepForward className="w-3 h-3" />
               Step
             </Button>
             <Button
               onClick={onTogglePlay}
-              disabled={isPoolingComplete || phase !== 'pooling'}
+              disabled={isPoolingComplete || !canRunPooling}
               variant="default"
               size="sm"
               className="h-7 px-2 text-xs flex items-center gap-1"
-              title={phase !== 'pooling' ? 'Complete convolution first' : 'Auto-play pooling'}
+              title={!canRunPooling ? 'Start pooling first' : 'Auto-play pooling'}
             >
               {isPlaying ? (
                 <>

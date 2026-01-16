@@ -396,7 +396,8 @@ export function useCNNVisualization() {
   const step = useCallback(() => {
     if (phase === 'convolution') {
       if (convStep >= totalConvSteps) {
-        setPhase('activation');
+        // Convolution already complete, don't auto-transition
+        setIsPlaying(false);
         return;
       }
       
@@ -415,14 +416,20 @@ export function useCNNVisualization() {
       
       setConvStep(prev => prev + 1);
       
-      // Check if convolution is complete
+      // Convolution complete - stop playing but DON'T auto-transition
+      // User must explicitly start activation
       if (convStep + 1 >= totalConvSteps) {
-        setPhase('activation');
+        setIsPlaying(false);
+        if (playIntervalRef.current) {
+          clearInterval(playIntervalRef.current);
+          playIntervalRef.current = null;
+        }
       }
     } else if (phase === 'activation') {
       // Handle activation phase
       if (activationStep >= totalActivationSteps) {
-        setPhase('pooling');
+        // Activation already complete, don't auto-transition
+        setIsPlaying(false);
         return;
       }
       
@@ -463,9 +470,14 @@ export function useCNNVisualization() {
       
       setActivationStep(prev => prev + 1);
       
-      // Check if activation is complete
+      // Activation complete - stop playing but DON'T auto-transition
+      // User must explicitly start pooling
       if (activationStep + 1 >= totalActivationSteps) {
-        setPhase('pooling');
+        setIsPlaying(false);
+        if (playIntervalRef.current) {
+          clearInterval(playIntervalRef.current);
+          playIntervalRef.current = null;
+        }
       }
     } else {
       // Handle Global Average Pooling separately - it's a single step
@@ -586,9 +598,13 @@ export function useCNNVisualization() {
     
     setActivationStep(prev => prev + 1);
     
+    // Activation complete - stop playing but DON'T auto-transition
     if (activationStep + 1 >= totalActivationSteps) {
       setIsActivationPlaying(false);
-      setPhase('pooling');
+      if (activationIntervalRef.current) {
+        clearInterval(activationIntervalRef.current);
+        activationIntervalRef.current = null;
+      }
     }
   }, [phase, activationStep, totalActivationSteps, convOutputSize, featureMap, 
       activationType, applyReLU, applySigmoid, activatedFeatureMap]);
@@ -749,6 +765,47 @@ export function useCNNVisualization() {
     };
   }, [isPlaying, step]);
 
+  // NEW: Functions to explicitly start each phase
+  const startActivation = useCallback(() => {
+    if (convStep >= totalConvSteps) {
+      setPhase('activation');
+    }
+  }, [convStep, totalConvSteps]);
+
+  const startPooling = useCallback(() => {
+    // Allow pooling to start at any time after convolution is complete
+    // This allows pooling on raw feature map OR activated (partial or full)
+    if (convStep >= totalConvSteps) {
+      setPhase('pooling');
+    }
+  }, [convStep, totalConvSteps]);
+
+  // Status indicators for each stage
+  const convolutionStatus = useMemo(() => {
+    if (convStep === 0) return 'waiting';
+    if (convStep < totalConvSteps) return 'running';
+    return 'completed';
+  }, [convStep, totalConvSteps]);
+
+  const activationStatus = useMemo(() => {
+    if (phase === 'convolution') return 'waiting';
+    if (activationStep === 0 && phase !== 'activation') return 'waiting';
+    if (activationStep < totalActivationSteps && (phase === 'activation' || isActivationPlaying)) return 'running';
+    if (activationStep >= totalActivationSteps) return 'completed';
+    if (activationStep > 0) return 'running';
+    return 'waiting';
+  }, [phase, activationStep, totalActivationSteps, isActivationPlaying]);
+
+  const poolingStatus = useMemo(() => {
+    if (convStep < totalConvSteps) return 'waiting';
+    if (poolStep === 0) return 'waiting';
+    if (poolStep < totalPoolSteps && (phase === 'pooling' || isPoolingPlaying)) return 'running';
+    if (poolingType === 'globalAverage' && poolStep >= 1) return 'completed';
+    if (poolStep >= totalPoolSteps) return 'completed';
+    if (poolStep > 0) return 'running';
+    return 'waiting';
+  }, [convStep, totalConvSteps, poolStep, totalPoolSteps, phase, isPoolingPlaying, poolingType]);
+
   // Check if complete - handle global average pooling separately (only 1 step)
   const isComplete = phase === 'pooling' && (
     poolingType === 'globalAverage' ? poolStep >= 1 : poolStep >= totalPoolSteps
@@ -817,6 +874,16 @@ export function useCNNVisualization() {
     stepPooling,
     togglePoolingPlay,
     resetPooling,
+    
+    // NEW: Phase control functions
+    startActivation,
+    startPooling,
+    
+    // NEW: Status indicators
+    convolutionStatus,
+    activationStatus,
+    poolingStatus,
+    isConvolutionComplete: convStep >= totalConvSteps,
     
     // Actions
     setSelectedClass,

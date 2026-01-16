@@ -1,7 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivationType, PoolingSourceType } from '@/hooks/useCNNVisualization';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, StepForward } from 'lucide-react';
+import { Play, Pause, RotateCcw, StepForward, PlayCircle } from 'lucide-react';
+
+// Status type for display
+type StageStatus = 'waiting' | 'running' | 'completed';
 
 // Activation type labels and descriptions for UI
 const ACTIVATION_TYPE_LABELS: Record<ActivationType, string> = {
@@ -40,6 +43,17 @@ interface ActivationVisualizationProps {
   isActivationComplete: boolean;
   activationStep: number;
   totalActivationSteps: number;
+  // NEW: Status indicator
+  status: StageStatus;
+  // NEW: Convolution complete check (to enable activation)
+  isConvolutionComplete: boolean;
+  // NEW: Function to start activation phase
+  onStartActivation: () => void;
+  // NEW: Hover callbacks to highlight feature map
+  onActivatedCellHover?: (row: number, col: number) => void;
+  onActivatedCellLeave?: () => void;
+  // NEW: Stride for calculating input window position
+  stride?: number;
 }
 
 export function ActivationVisualization({
@@ -58,7 +72,16 @@ export function ActivationVisualization({
   isActivationComplete,
   activationStep,
   totalActivationSteps,
+  status,
+  isConvolutionComplete,
+  onStartActivation,
+  onActivatedCellHover,
+  onActivatedCellLeave,
+  stride = 1,
 }: ActivationVisualizationProps) {
+  // Track hovered cell
+  const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
+
   // Calculate min/max for color scaling
   const { minVal, maxVal } = useMemo(() => {
     let min = 0;
@@ -135,46 +158,80 @@ export function ActivationVisualization({
   const computedCells = activatedMap.flat().filter(v => v !== null).length;
   const totalCells = size * size;
 
+  // Get status badge styling
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'waiting':
+        return { text: 'Waiting', className: 'bg-gray-100 text-gray-600' };
+      case 'running':
+        return { text: 'Running', className: 'bg-blue-100 text-blue-600 animate-pulse' };
+      case 'completed':
+        return { text: 'Completed', className: 'bg-green-100 text-green-600' };
+    }
+  };
+
+  const statusBadge = getStatusBadge();
+
+  // Can we run activation controls?
+  const canRunActivation = isConvolutionComplete && phase === 'activation';
+
   return (
     <div className="bg-card rounded-lg border border-border shadow-sm p-3">
-      {/* Header with Step/Play/Reset buttons */}
+      {/* Header with Status and Controls */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-foreground">Activation Function</h3>
+          <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${statusBadge.className}`}>
+            {statusBadge.text}
+          </span>
           <span className="text-xs text-muted-foreground">
             Step {activationStep}/{totalActivationSteps}
           </span>
         </div>
-        {/* Step/Play/Reset Buttons */}
-        <div className="flex gap-1">
+        {/* Start Activation Button (shown when convolution is complete but activation hasn't started) */}
+        {isConvolutionComplete && phase !== 'activation' && phase !== 'pooling' && activationStep === 0 && (
           <Button
-            onClick={onStep}
-            disabled={isPlaying || isActivationComplete || phase !== 'activation'}
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs flex items-center gap-1"
-            title={phase !== 'activation' ? 'Complete convolution first' : 'Step through activation'}
-          >
-            <StepForward className="w-3 h-3" />
-            Step
-          </Button>
-          <Button
-            onClick={onTogglePlay}
-            disabled={isActivationComplete || phase !== 'activation'}
+            onClick={onStartActivation}
             variant="default"
             size="sm"
-            className="h-7 px-2 text-xs flex items-center gap-1"
-            title={phase !== 'activation' ? 'Complete convolution first' : 'Auto-play activation'}
+            className="h-7 px-3 text-xs flex items-center gap-1 bg-orange-500 hover:bg-orange-600"
+            title="Start activation phase"
           >
-            {isPlaying ? (
-              <>
-                <Pause className="w-3 h-3" />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="w-3 h-3" />
-                Play
+            <PlayCircle className="w-3 h-3" />
+            Start Activation
+          </Button>
+        )}
+        {/* Step/Play/Reset Buttons (shown when in activation phase) */}
+        {(phase === 'activation' || activationStep > 0) && (
+          <div className="flex gap-1">
+            <Button
+              onClick={onStep}
+              disabled={isPlaying || isActivationComplete || !canRunActivation}
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs flex items-center gap-1"
+              title={!canRunActivation ? 'Complete convolution first' : 'Step through activation'}
+            >
+              <StepForward className="w-3 h-3" />
+              Step
+            </Button>
+            <Button
+              onClick={onTogglePlay}
+              disabled={isActivationComplete || !canRunActivation}
+              variant="default"
+              size="sm"
+              className="h-7 px-2 text-xs flex items-center gap-1"
+              title={!canRunActivation ? 'Complete convolution first' : 'Auto-play activation'}
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="w-3 h-3" />
+                  Pause
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3" />
+                  Play
               </>
             )}
           </Button>
@@ -189,6 +246,7 @@ export function ActivationVisualization({
             Reset
           </Button>
         </div>
+        )}
       </div>
 
       {/* Activation Type Control Panel */}
@@ -227,12 +285,17 @@ export function ActivationVisualization({
       <div className="text-center mb-3">
         <h4 className="text-xs font-medium text-muted-foreground mb-2">
           Activated Feature Map ({size}×{size})
+          {hoveredCell && (
+            <span className="ml-2 text-orange-600">
+              Hovering: ({hoveredCell.row}, {hoveredCell.col})
+            </span>
+          )}
         </h4>
         <div className="flex justify-center">
           <div 
             className="inline-grid bg-border"
             style={{ 
-              gridTemplateColumns: `repeat(${size}, 12px)`,
+              gridTemplateColumns: `repeat(${size}, 18px)`,
               gap: '1px',
               padding: '1px',
             }}
@@ -241,25 +304,36 @@ export function ActivationVisualization({
               row.map((val, colIdx) => {
                 const colors = getColor(val);
                 const isComputed = val !== null;
+                const isHovered = hoveredCell?.row === rowIdx && hoveredCell?.col === colIdx;
                 
                 return (
                   <div
                     key={`activated-${rowIdx}-${colIdx}`}
                     className={`flex items-center justify-center transition-all ${
-                      isComputed ? 'cursor-pointer hover:scale-105' : ''
-                    }`}
+                      isComputed ? 'cursor-pointer' : ''
+                    } ${isHovered ? 'ring-2 ring-orange-500 scale-110 z-10' : ''}`}
                     style={{ 
-                      width: '12px',
-                      height: '12px',
+                      width: '18px',
+                      height: '18px',
                       backgroundColor: colors.bg,
                       color: colors.text,
-                      fontSize: '5px',
+                      fontSize: '7px',
                       fontFamily: 'monospace',
                       fontWeight: 600,
                     }}
-                    title={isComputed ? `(${rowIdx}, ${colIdx}): ${val?.toFixed(4)}` : 'Not computed'}
+                    title={isComputed ? `(${rowIdx}, ${colIdx}): ${val?.toFixed(4)}\nHover to highlight source in Feature Map` : 'Not computed'}
+                    onMouseEnter={() => {
+                      if (isComputed) {
+                        setHoveredCell({ row: rowIdx, col: colIdx });
+                        onActivatedCellHover?.(rowIdx, colIdx);
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredCell(null);
+                      onActivatedCellLeave?.();
+                    }}
                   >
-                    {/* Only show value for larger cells or on hover */}
+                    {formatValue(val)}
                   </div>
                 );
               })

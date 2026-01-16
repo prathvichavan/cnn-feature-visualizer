@@ -14,9 +14,10 @@ interface FeatureMapDisplayProps {
   onCellHover?: (row: number, col: number) => void;
   onCellLeave?: () => void;
   poolingHighlight?: PoolingHighlight | null; // Highlight from pooling interaction
+  activationHighlight?: { row: number; col: number } | null; // Highlight from activation hover
 }
 
-export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, poolingHighlight }: FeatureMapDisplayProps) {
+export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, poolingHighlight, activationHighlight }: FeatureMapDisplayProps) {
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
   
   const { minVal, maxVal } = useMemo(() => {
@@ -94,6 +95,12 @@ export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, 
     return row === maxCellPosition.row && col === maxCellPosition.col;
   };
 
+  // Check if a cell is highlighted from activation hover
+  const isActivationHighlighted = (row: number, col: number): boolean => {
+    if (!activationHighlight) return false;
+    return row === activationHighlight.row && col === activationHighlight.col;
+  };
+
   return (
     <div className="bg-card rounded-lg border border-border shadow-sm p-2">
       <div className="flex items-center justify-between mb-2">
@@ -121,8 +128,9 @@ export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, 
               const colors = getColor(val);
               const inPoolWindow = isInPoolingWindow(rowIdx, colIdx);
               const isMax = isMaxCell(rowIdx, colIdx);
+              const isActivationHovered = isActivationHighlighted(rowIdx, colIdx);
               
-              // Determine cell styling based on pooling highlight
+              // Determine cell styling based on highlights
               let cellStyle: React.CSSProperties = {
                 width: '18px',
                 height: '18px',
@@ -133,8 +141,18 @@ export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, 
                 fontWeight: 600,
               };
               
+              // If this cell is highlighted from activation hover
+              if (isActivationHovered) {
+                cellStyle = {
+                  ...cellStyle,
+                  backgroundColor: '#FF9800', // Orange highlight
+                  color: '#000000',
+                  border: '2px solid #E65100', // Dark orange border
+                  fontWeight: 800,
+                };
+              }
               // If this is the MAX cell, highlight with yellow background and bold border
-              if (isMax) {
+              else if (isMax) {
                 cellStyle = {
                   ...cellStyle,
                   backgroundColor: '#FFEB3B', // Bright yellow
@@ -158,7 +176,7 @@ export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, 
                     hoveredCell?.row === rowIdx && hoveredCell?.col === colIdx
                       ? 'ring-2 ring-blue-400 z-10'
                       : ''
-                  } ${isMax ? 'z-20 scale-110' : ''}`}
+                  } ${isMax ? 'z-20 scale-110' : ''} ${isActivationHovered ? 'z-20 scale-110' : ''}`}
                   style={cellStyle}
                   onMouseEnter={() => {
                     setHoveredCell({ row: rowIdx, col: colIdx });
@@ -168,7 +186,7 @@ export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, 
                     setHoveredCell(null);
                     if (typeof onCellLeave === 'function') onCellLeave();
                   }}
-                  title={val !== null ? `(${rowIdx}, ${colIdx}): ${val}` : 'Not computed'}
+                  title={val !== null ? `(${rowIdx}, ${colIdx}): ${val}${isActivationHovered ? ' ← Activation source' : ''}` : 'Not computed'}
                 >
                   {formatValue(val)}
                 </div>
