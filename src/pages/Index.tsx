@@ -4,6 +4,7 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { InputImageGrid } from '@/components/InputImageGrid';
 import { ConvolutionVisualization } from '@/components/ConvolutionVisualization';
 import { FeatureMapDisplay } from '@/components/FeatureMapDisplay';
+import { ActivationVisualization } from '@/components/ActivationVisualization';
 import { PoolingVisualization } from '@/components/PoolingVisualization';
 import { ExplanationPanel } from '@/components/ExplanationPanel';
 import { useCNNVisualization, PoolingType } from '@/hooks/useCNNVisualization';
@@ -45,6 +46,23 @@ const Index = () => {
     // NEW: Pooling type
     poolingType,
     setPoolingType,
+    // NEW: Activation function
+    activationType,
+    setActivationType,
+    activatedFeatureMap,
+    displayedActivationMap,
+    activationStep,
+    totalActivationSteps,
+    // NEW: Dedicated activation controls
+    isActivationPlaying,
+    isActivationComplete,
+    stepActivation,
+    toggleActivationPlay,
+    resetActivation,
+    // NEW: Pooling source
+    poolingSource,
+    setPoolingSource,
+    poolingInputMap,
     // NEW: Dedicated pooling controls
     isPoolingPlaying,
     isPoolingComplete,
@@ -168,9 +186,14 @@ const Index = () => {
       return;
     }
 
-    // Calculate the corresponding 2x2 window in the feature map
+    // Calculate the corresponding 2x2 window in the feature map (or activated map based on poolingSource)
     const convRowStart = pooledRow * 2; // stride = 2
     const convColStart = pooledCol * 2;
+
+    // Use the pooling input map (raw or activated based on poolingSource)
+    const sourceMap = poolingInputMap.length > 0 
+      ? poolingInputMap 
+      : displayFeatureMap;
 
     // Extract 2x2 window and find max/min
     const window: number[][] = [];
@@ -189,7 +212,7 @@ const Index = () => {
       for (let j = 0; j < 2; j++) {
         const r = convRowStart + i;
         const c = convColStart + j;
-        const val = displayFeatureMap[r]?.[c] ?? 0;
+        const val = sourceMap[r]?.[c] ?? 0;
         windowRow.push(val);
         sum += val;
         
@@ -269,6 +292,11 @@ const Index = () => {
     ? pooledMap 
     : Array(poolOutputSize).fill(null).map(() => Array(poolOutputSize).fill(null));
 
+  // Display pooling input map (either raw or activated based on poolingSource)
+  const displayPoolingInputMap = poolingInputMap.length > 0 
+    ? poolingInputMap 
+    : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null));
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -335,6 +363,27 @@ const Index = () => {
             poolingHighlight={poolingHighlight}
           />
         </div>
+
+        {/* Activation Function - Between Feature Map and Pooling */}
+        <ActivationVisualization
+          featureMap={displayFeatureMap}
+          activatedMap={activatedFeatureMap.length > 0 
+            ? activatedFeatureMap 
+            : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
+          size={convOutputSize}
+          activationType={activationType}
+          onActivationTypeChange={setActivationType}
+          poolingSource={poolingSource}
+          onPoolingSourceChange={setPoolingSource}
+          phase={phase}
+          onStep={stepActivation}
+          onTogglePlay={toggleActivationPlay}
+          onReset={resetActivation}
+          isPlaying={isActivationPlaying}
+          isActivationComplete={isActivationComplete}
+          activationStep={activationStep}
+          totalActivationSteps={totalActivationSteps}
+        />
 
         {/* Pooling Operation */}
         <PoolingVisualization

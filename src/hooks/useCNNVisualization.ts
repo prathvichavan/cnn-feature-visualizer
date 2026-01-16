@@ -4,6 +4,12 @@ import { mnistSamples, fashionMnistSamples, filters, FilterType, DatasetType } f
 // Pooling type options
 export type PoolingType = 'max' | 'min' | 'average' | 'globalAverage';
 
+// Activation function types
+export type ActivationType = 'none' | 'relu' | 'sigmoid' | 'softmax';
+
+// Pooling source options
+export type PoolingSourceType = 'raw' | 'activated';
+
 export interface ConvolutionStep {
   inputWindow: number[][];
   filterWindow: number[][];
@@ -34,8 +40,9 @@ export function useCNNVisualization() {
   const [filterType, setFilterType] = useState<FilterType>('topEdge');
   const [convStep, setConvStep] = useState(0);
   const [poolStep, setPoolStep] = useState(0);
+  const [activationStep, setActivationStep] = useState(0); // NEW: Activation step counter
   const [isPlaying, setIsPlaying] = useState(false);
-  const [phase, setPhase] = useState<'convolution' | 'pooling'>('convolution');
+  const [phase, setPhase] = useState<'convolution' | 'activation' | 'pooling'>('convolution');
   const [featureMap, setFeatureMap] = useState<number[][]>([]);
   const [pooledMap, setPooledMap] = useState<number[][]>([]);
   const [currentConvStep, setCurrentConvStep] = useState<ConvolutionStep | null>(null);
@@ -47,6 +54,16 @@ export function useCNNVisualization() {
   
   // NEW: Pooling type state
   const [poolingType, setPoolingType] = useState<PoolingType>('max');
+  
+  // NEW: Activation function state
+  const [activationType, setActivationType] = useState<ActivationType>('relu');
+  
+  // NEW: Activation-specific playing state
+  const [isActivationPlaying, setIsActivationPlaying] = useState(false);
+  const activationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // NEW: Pooling source state (raw feature map or activated feature map)
+  const [poolingSource, setPoolingSource] = useState<PoolingSourceType>('activated');
   
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -95,6 +112,93 @@ export function useCNNVisualization() {
   
   const totalConvSteps = convOutputSize * convOutputSize;
   const totalPoolSteps = poolOutputSize * poolOutputSize;
+
+  // Activation function implementations
+  const applyReLU = useCallback((value: number): number => {
+    return Math.max(0, value);
+  }, []);
+
+  const applySigmoid = useCallback((value: number): number => {
+    return 1 / (1 + Math.exp(-value / 100)); // Scaled for better visualization
+  }, []);
+
+  const applySoftmax = useCallback((values: number[]): number[] => {
+    // Find max for numerical stability
+    const maxVal = Math.max(...values);
+    const expValues = values.map(v => Math.exp((v - maxVal) / 100)); // Scaled for stability
+    const sumExp = expValues.reduce((a, b) => a + b, 0);
+    return expValues.map(v => v / sumExp);
+  }, []);
+
+  // Compute activated feature map based on activation type
+  const activatedFeatureMap = useMemo(() => {
+    if (featureMap.length === 0) return [];
+    
+    const rows = featureMap.length;
+    const cols = featureMap[0].length;
+    
+    switch (activationType) {
+      case 'none':
+        return featureMap;
+      
+      case 'relu':
+        return featureMap.map(row => 
+          row.map(val => val !== null ? applyReLU(val) : null)
+        );
+      
+      case 'sigmoid':
+        return featureMap.map(row => 
+          row.map(val => val !== null ? applySigmoid(val) : null)
+        );
+      
+      case 'softmax': {
+        // Flatten all non-null values
+        const flatValues: number[] = [];
+        const positions: { row: number; col: number }[] = [];
+        
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            if (featureMap[i][j] !== null) {
+              flatValues.push(featureMap[i][j]);
+              positions.push({ row: i, col: j });
+            }
+          }
+        }
+        
+        if (flatValues.length === 0) return featureMap;
+        
+        // Apply softmax across all values
+        const softmaxValues = applySoftmax(flatValues);
+        
+        // Reconstruct the 2D array
+        const result: (number | null)[][] = featureMap.map(row => row.map(() => null));
+        positions.forEach((pos, idx) => {
+          result[pos.row][pos.col] = softmaxValues[idx];
+        });
+        
+        return result;
+      }
+      
+      default:
+        return featureMap;
+    }
+  }, [featureMap, activationType, applyReLU, applySigmoid, applySoftmax]);
+
+  // Total activation steps (same as total conv steps since it's element-wise)
+  const totalActivationSteps = convOutputSize * convOutputSize;
+
+  // Step-by-step activated feature map (shows progress of activation)
+  const [displayedActivationMap, setDisplayedActivationMap] = useState<(number | null)[][]>([]);
+
+  // Get the feature map to use for pooling based on poolingSource
+  const poolingInputMap = useMemo(() => {
+    if (poolingSource === 'activated') {
+      // Use the step-by-step displayed activation map if in activation phase
+      // Otherwise use the fully computed activated map
+      return displayedActivationMap.length > 0 ? displayedActivationMap : activatedFeatureMap;
+    }
+    return featureMap;
+  }, [poolingSource, displayedActivationMap, activatedFeatureMap, featureMap]);
 
   // Perform single convolution at position
   // Note: row and col represent the OUTPUT position
@@ -206,15 +310,22 @@ export function useCNNVisualization() {
   const reset = useCallback(() => {
     setConvStep(0);
     setPoolStep(0);
+    setActivationStep(0);
     setPhase('convolution');
     setFeatureMap([]);
     setPooledMap([]);
+    setDisplayedActivationMap([]);
     setCurrentConvStep(null);
     setCurrentPoolStep(null);
     setIsPlaying(false);
+    setIsActivationPlaying(false);
     if (playIntervalRef.current) {
       clearInterval(playIntervalRef.current);
       playIntervalRef.current = null;
+    }
+    if (activationIntervalRef.current) {
+      clearInterval(activationIntervalRef.current);
+      activationIntervalRef.current = null;
     }
   }, []);
 
@@ -226,6 +337,35 @@ export function useCNNVisualization() {
   // NEW: Pooling-specific playing state
   const [isPoolingPlaying, setIsPoolingPlaying] = useState(false);
   const poolingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset activation when activation type changes (but keep convolution results)
+  const resetActivation = useCallback(() => {
+    setActivationStep(0);
+    setDisplayedActivationMap([]);
+    setPoolStep(0);
+    setPooledMap([]);
+    setCurrentPoolStep(null);
+    if (phase === 'activation' || phase === 'pooling') {
+      setPhase('activation');
+    }
+    setIsActivationPlaying(false);
+    setIsPoolingPlaying(false);
+    if (activationIntervalRef.current) {
+      clearInterval(activationIntervalRef.current);
+      activationIntervalRef.current = null;
+    }
+    if (poolingIntervalRef.current) {
+      clearInterval(poolingIntervalRef.current);
+      poolingIntervalRef.current = null;
+    }
+  }, [phase]);
+
+  // Reset activation when activation type changes
+  useEffect(() => {
+    if (phase === 'activation' || phase === 'pooling') {
+      resetActivation();
+    }
+  }, [activationType]);
 
   // Reset pooling when pooling type changes (but keep convolution results)
   const resetPooling = useCallback(() => {
@@ -256,7 +396,7 @@ export function useCNNVisualization() {
   const step = useCallback(() => {
     if (phase === 'convolution') {
       if (convStep >= totalConvSteps) {
-        setPhase('pooling');
+        setPhase('activation');
         return;
       }
       
@@ -277,6 +417,54 @@ export function useCNNVisualization() {
       
       // Check if convolution is complete
       if (convStep + 1 >= totalConvSteps) {
+        setPhase('activation');
+      }
+    } else if (phase === 'activation') {
+      // Handle activation phase
+      if (activationStep >= totalActivationSteps) {
+        setPhase('pooling');
+        return;
+      }
+      
+      const row = Math.floor(activationStep / convOutputSize);
+      const col = activationStep % convOutputSize;
+      
+      // Apply activation to this cell
+      const rawValue = featureMap[row]?.[col];
+      let activatedValue: number | null = null;
+      
+      if (rawValue !== null) {
+        switch (activationType) {
+          case 'none':
+            activatedValue = rawValue;
+            break;
+          case 'relu':
+            activatedValue = applyReLU(rawValue);
+            break;
+          case 'sigmoid':
+            activatedValue = applySigmoid(rawValue);
+            break;
+          case 'softmax':
+            // For softmax, we need all values - compute incrementally
+            activatedValue = activatedFeatureMap[row]?.[col] ?? rawValue;
+            break;
+          default:
+            activatedValue = rawValue;
+        }
+      }
+      
+      setDisplayedActivationMap(prev => {
+        const newMap = prev.length === 0 
+          ? Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))
+          : prev.map(r => [...r]);
+        newMap[row][col] = activatedValue;
+        return newMap;
+      });
+      
+      setActivationStep(prev => prev + 1);
+      
+      // Check if activation is complete
+      if (activationStep + 1 >= totalActivationSteps) {
         setPhase('pooling');
       }
     } else {
@@ -287,19 +475,19 @@ export function useCNNVisualization() {
           return;
         }
         
-        // Use complete feature map for pooling
-        const completeFeatureMap = featureMap.length > 0 ? featureMap : 
+        // Use poolingInputMap (activated or raw based on poolingSource setting)
+        const inputMap = poolingInputMap.length > 0 ? poolingInputMap : 
           Array(convOutputSize).fill(null).map((_, r) => 
             Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
           );
         
-        const globalAvg = performGlobalAveragePooling(completeFeatureMap);
+        const globalAvg = performGlobalAveragePooling(inputMap);
         
         // Create a special pooling step for global average
         const stepResult: PoolingStep = {
-          window: completeFeatureMap, // The entire feature map is the window
-          maxValue: Math.max(...completeFeatureMap.flat()),
-          minValue: Math.min(...completeFeatureMap.flat()),
+          window: inputMap, // The entire feature map is the window
+          maxValue: Math.max(...inputMap.flat()),
+          minValue: Math.min(...inputMap.flat()),
           avgValue: globalAvg,
           resultValue: globalAvg,
           row: 0,
@@ -323,13 +511,13 @@ export function useCNNVisualization() {
       const row = Math.floor(poolStep / poolOutputSize);
       const col = poolStep % poolOutputSize;
       
-      // Use complete feature map for pooling
-      const completeFeatureMap = featureMap.length > 0 ? featureMap : 
+      // Use poolingInputMap (activated or raw based on poolingSource setting)
+      const inputMap = poolingInputMap.length > 0 ? poolingInputMap : 
         Array(convOutputSize).fill(null).map((_, r) => 
           Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
         );
       
-      const stepResult = performPooling(row, col, completeFeatureMap, poolingType);
+      const stepResult = performPooling(row, col, inputMap, poolingType);
       
       setCurrentPoolStep(stepResult);
       setPooledMap(prev => {
@@ -347,8 +535,91 @@ export function useCNNVisualization() {
         setIsPoolingPlaying(false);
       }
     }
-  }, [phase, convStep, poolStep, totalConvSteps, totalPoolSteps, convOutputSize, poolOutputSize, 
-      performConvolution, performPooling, performGlobalAveragePooling, featureMap, poolingType]);
+  }, [phase, convStep, poolStep, activationStep, totalConvSteps, totalPoolSteps, totalActivationSteps, 
+      convOutputSize, poolOutputSize, performConvolution, performPooling, performGlobalAveragePooling, 
+      poolingInputMap, poolingType, featureMap, activationType, applyReLU, applySigmoid, activatedFeatureMap]);
+
+  // NEW: Step through activation only (for dedicated activation controls)
+  const stepActivation = useCallback(() => {
+    if (phase !== 'activation') return;
+    
+    if (activationStep >= totalActivationSteps) {
+      setIsActivationPlaying(false);
+      setPhase('pooling');
+      return;
+    }
+    
+    const row = Math.floor(activationStep / convOutputSize);
+    const col = activationStep % convOutputSize;
+    
+    // Apply activation to this cell
+    const rawValue = featureMap[row]?.[col];
+    let activatedValue: number | null = null;
+    
+    if (rawValue !== null) {
+      switch (activationType) {
+        case 'none':
+          activatedValue = rawValue;
+          break;
+        case 'relu':
+          activatedValue = applyReLU(rawValue);
+          break;
+        case 'sigmoid':
+          activatedValue = applySigmoid(rawValue);
+          break;
+        case 'softmax':
+          // For softmax, use pre-computed value
+          activatedValue = activatedFeatureMap[row]?.[col] ?? rawValue;
+          break;
+        default:
+          activatedValue = rawValue;
+      }
+    }
+    
+    setDisplayedActivationMap(prev => {
+      const newMap = prev.length === 0 
+        ? Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))
+        : prev.map(r => [...r]);
+      newMap[row][col] = activatedValue;
+      return newMap;
+    });
+    
+    setActivationStep(prev => prev + 1);
+    
+    if (activationStep + 1 >= totalActivationSteps) {
+      setIsActivationPlaying(false);
+      setPhase('pooling');
+    }
+  }, [phase, activationStep, totalActivationSteps, convOutputSize, featureMap, 
+      activationType, applyReLU, applySigmoid, activatedFeatureMap]);
+
+  // NEW: Toggle activation play/pause
+  const toggleActivationPlay = useCallback(() => {
+    if (isActivationPlaying) {
+      setIsActivationPlaying(false);
+      if (activationIntervalRef.current) {
+        clearInterval(activationIntervalRef.current);
+        activationIntervalRef.current = null;
+      }
+    } else {
+      setIsActivationPlaying(true);
+    }
+  }, [isActivationPlaying]);
+
+  // Auto-step activation when activation is playing
+  useEffect(() => {
+    if (isActivationPlaying && phase === 'activation') {
+      activationIntervalRef.current = setInterval(() => {
+        stepActivation();
+      }, 50);
+    }
+    
+    return () => {
+      if (activationIntervalRef.current) {
+        clearInterval(activationIntervalRef.current);
+      }
+    };
+  }, [isActivationPlaying, stepActivation, phase]);
 
   // NEW: Step through pooling only (for dedicated pooling controls)
   const stepPooling = useCallback(() => {
@@ -361,19 +632,19 @@ export function useCNNVisualization() {
         return;
       }
       
-      // Use complete feature map for pooling
-      const completeFeatureMap = featureMap.length > 0 ? featureMap : 
+      // Use poolingInputMap (activated or raw based on poolingSource setting)
+      const inputMap = poolingInputMap.length > 0 ? poolingInputMap : 
         Array(convOutputSize).fill(null).map((_, r) => 
           Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
         );
       
-      const globalAvg = performGlobalAveragePooling(completeFeatureMap);
+      const globalAvg = performGlobalAveragePooling(inputMap);
       
       // Create a special pooling step for global average
       const stepResult: PoolingStep = {
-        window: completeFeatureMap,
-        maxValue: Math.max(...completeFeatureMap.flat()),
-        minValue: Math.min(...completeFeatureMap.flat()),
+        window: inputMap,
+        maxValue: Math.max(...inputMap.flat()),
+        minValue: Math.min(...inputMap.flat()),
         avgValue: globalAvg,
         resultValue: globalAvg,
         row: 0,
@@ -397,13 +668,13 @@ export function useCNNVisualization() {
     const row = Math.floor(poolStep / poolOutputSize);
     const col = poolStep % poolOutputSize;
     
-    // Use complete feature map for pooling
-    const completeFeatureMap = featureMap.length > 0 ? featureMap : 
+    // Use poolingInputMap (activated or raw based on poolingSource setting)
+    const inputMap = poolingInputMap.length > 0 ? poolingInputMap : 
       Array(convOutputSize).fill(null).map((_, r) => 
         Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
       );
     
-    const stepResult = performPooling(row, col, completeFeatureMap, poolingType);
+    const stepResult = performPooling(row, col, inputMap, poolingType);
     
     setCurrentPoolStep(stepResult);
     setPooledMap(prev => {
@@ -420,7 +691,7 @@ export function useCNNVisualization() {
       setIsPoolingPlaying(false);
     }
   }, [phase, poolStep, totalPoolSteps, poolOutputSize, convOutputSize, 
-      performConvolution, performPooling, performGlobalAveragePooling, featureMap, poolingType]);
+      performConvolution, performPooling, performGlobalAveragePooling, poolingInputMap, poolingType]);
 
   // NEW: Toggle pooling play/pause (dedicated for pooling section)
   const togglePoolingPlay = useCallback(() => {
@@ -519,6 +790,26 @@ export function useCNNVisualization() {
     // NEW: Pooling type state
     poolingType,
     setPoolingType,
+    
+    // NEW: Activation function state
+    activationType,
+    setActivationType,
+    activatedFeatureMap,
+    displayedActivationMap,
+    activationStep,
+    totalActivationSteps,
+    
+    // NEW: Dedicated activation controls
+    isActivationPlaying,
+    isActivationComplete: activationStep >= totalActivationSteps,
+    stepActivation,
+    toggleActivationPlay,
+    resetActivation,
+    
+    // NEW: Pooling source state
+    poolingSource,
+    setPoolingSource,
+    poolingInputMap,
     
     // NEW: Dedicated pooling controls
     isPoolingPlaying,
