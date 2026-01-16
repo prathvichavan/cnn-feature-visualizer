@@ -34,7 +34,7 @@ interface ActivationVisualizationProps {
   onActivationTypeChange: (type: ActivationType) => void;
   poolingSource: PoolingSourceType;
   onPoolingSourceChange: (source: PoolingSourceType) => void;
-  phase: 'convolution' | 'activation' | 'pooling';
+  phase: 'convolution' | 'activation' | 'pooling' | 'flatten' | 'dense';
   // Step/Play/Reset controls for activation
   onStep: () => void;
   onTogglePlay: () => void;

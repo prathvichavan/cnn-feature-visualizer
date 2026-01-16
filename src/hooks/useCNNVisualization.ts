@@ -10,6 +10,12 @@ export type ActivationType = 'none' | 'relu' | 'sigmoid' | 'softmax';
 // Pooling source options
 export type PoolingSourceType = 'raw' | 'activated';
 
+// Flatten source options
+export type FlattenSourceType = 'raw' | 'activated' | 'pooled';
+
+// Dense layer activation types
+export type DenseActivationType = 'none' | 'relu' | 'softmax';
+
 export interface ConvolutionStep {
   inputWindow: number[][];
   filterWindow: number[][];
@@ -42,7 +48,7 @@ export function useCNNVisualization() {
   const [poolStep, setPoolStep] = useState(0);
   const [activationStep, setActivationStep] = useState(0); // NEW: Activation step counter
   const [isPlaying, setIsPlaying] = useState(false);
-  const [phase, setPhase] = useState<'convolution' | 'activation' | 'pooling'>('convolution');
+  const [phase, setPhase] = useState<'convolution' | 'activation' | 'pooling' | 'flatten' | 'dense'>('convolution');
   const [featureMap, setFeatureMap] = useState<number[][]>([]);
   const [pooledMap, setPooledMap] = useState<number[][]>([]);
   const [currentConvStep, setCurrentConvStep] = useState<ConvolutionStep | null>(null);
@@ -64,6 +70,28 @@ export function useCNNVisualization() {
   
   // NEW: Pooling source state (raw feature map or activated feature map)
   const [poolingSource, setPoolingSource] = useState<PoolingSourceType>('activated');
+  
+  // NEW: Flatten layer state
+  const [flattenSource, setFlattenSource] = useState<FlattenSourceType>('pooled');
+  const [flattenedVector, setFlattenedVector] = useState<number[]>([]);
+  const [flattenStep, setFlattenStep] = useState(0); // Tracks current row being flattened
+  const [isFlattenPlaying, setIsFlattenPlaying] = useState(false);
+  const flattenIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // NEW: Dense layer state
+  const [denseLayerSize, setDenseLayerSize] = useState<number>(10);
+  const [selectedNeuron, setSelectedNeuron] = useState<number>(0);
+  const [denseWeights, setDenseWeights] = useState<number[][]>([]);
+  const [denseBiases, setDenseBiases] = useState<number[]>([]);
+  const [denseStep, setDenseStep] = useState(0); // Tracks current input being processed
+  const [denseRunningSum, setDenseRunningSum] = useState(0);
+  const [denseCurrentMultiplication, setDenseCurrentMultiplication] = useState<number | null>(null);
+  const [denseNeuronOutputs, setDenseNeuronOutputs] = useState<(number | null)[]>([]);
+  const [denseActivatedOutputs, setDenseActivatedOutputs] = useState<(number | null)[]>([]);
+  const [isDensePlaying, setIsDensePlaying] = useState(false);
+  const [denseActivationType, setDenseActivationType] = useState<DenseActivationType>('none');
+  const [showTopK, setShowTopK] = useState(false);
+  const denseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -200,6 +228,52 @@ export function useCNNVisualization() {
     return featureMap;
   }, [poolingSource, displayedActivationMap, activatedFeatureMap, featureMap]);
 
+  // Get the map to use for flattening based on flattenSource
+  // This creates a proper source map with fallback to ensure we always have valid data
+  const flattenInputMap = useMemo(() => {
+    let sourceMap: (number | null)[][] = [];
+    let expectedSize = 0;
+    
+    switch (flattenSource) {
+      case 'raw':
+        sourceMap = featureMap;
+        expectedSize = convOutputSize;
+        break;
+      case 'activated':
+        sourceMap = displayedActivationMap.length > 0 ? displayedActivationMap : activatedFeatureMap;
+        expectedSize = convOutputSize;
+        break;
+      case 'pooled':
+        sourceMap = pooledMap;
+        expectedSize = poolOutputSize;
+        break;
+      default:
+        sourceMap = pooledMap;
+        expectedSize = poolOutputSize;
+    }
+    
+    // If source map is empty or wrong size, create initialized array
+    if (sourceMap.length === 0 || sourceMap.length !== expectedSize) {
+      return Array(expectedSize).fill(null).map(() => Array(expectedSize).fill(null));
+    }
+    
+    return sourceMap;
+  }, [flattenSource, featureMap, displayedActivationMap, activatedFeatureMap, pooledMap, convOutputSize, poolOutputSize]);
+
+  // Calculate flatten input size based on source
+  const flattenInputSize = useMemo(() => {
+    if (flattenSource === 'pooled') {
+      return poolOutputSize;
+    }
+    return convOutputSize;
+  }, [flattenSource, poolOutputSize, convOutputSize]);
+
+  // Total flatten steps (one per row for row-by-row flattening)
+  const totalFlattenSteps = flattenInputSize;
+
+  // Total cells in flatten (for progress tracking)
+  const totalFlattenCells = flattenInputSize * flattenInputSize;
+
   // Perform single convolution at position
   // Note: row and col represent the OUTPUT position
   // We need to calculate the input window position using stride
@@ -311,14 +385,25 @@ export function useCNNVisualization() {
     setConvStep(0);
     setPoolStep(0);
     setActivationStep(0);
+    setFlattenStep(0);
+    setDenseStep(0);
     setPhase('convolution');
     setFeatureMap([]);
     setPooledMap([]);
     setDisplayedActivationMap([]);
+    setFlattenedVector([]);
+    setDenseRunningSum(0);
+    setDenseCurrentMultiplication(null);
+    setDenseNeuronOutputs([]);
+    setDenseActivatedOutputs([]);
+    setDenseWeights([]);
+    setDenseBiases([]);
     setCurrentConvStep(null);
     setCurrentPoolStep(null);
     setIsPlaying(false);
     setIsActivationPlaying(false);
+    setIsFlattenPlaying(false);
+    setIsDensePlaying(false);
     if (playIntervalRef.current) {
       clearInterval(playIntervalRef.current);
       playIntervalRef.current = null;
@@ -326,6 +411,14 @@ export function useCNNVisualization() {
     if (activationIntervalRef.current) {
       clearInterval(activationIntervalRef.current);
       activationIntervalRef.current = null;
+    }
+    if (flattenIntervalRef.current) {
+      clearInterval(flattenIntervalRef.current);
+      flattenIntervalRef.current = null;
+    }
+    if (denseIntervalRef.current) {
+      clearInterval(denseIntervalRef.current);
+      denseIntervalRef.current = null;
     }
   }, []);
 
@@ -339,17 +432,18 @@ export function useCNNVisualization() {
   const poolingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Reset activation when activation type changes (but keep convolution results)
+  // Note: Not resetting phase here - phase management is handled separately
   const resetActivation = useCallback(() => {
     setActivationStep(0);
     setDisplayedActivationMap([]);
     setPoolStep(0);
     setPooledMap([]);
+    setFlattenStep(0);
+    setFlattenedVector([]);
     setCurrentPoolStep(null);
-    if (phase === 'activation' || phase === 'pooling') {
-      setPhase('activation');
-    }
     setIsActivationPlaying(false);
     setIsPoolingPlaying(false);
+    setIsFlattenPlaying(false);
     if (activationIntervalRef.current) {
       clearInterval(activationIntervalRef.current);
       activationIntervalRef.current = null;
@@ -358,25 +452,29 @@ export function useCNNVisualization() {
       clearInterval(poolingIntervalRef.current);
       poolingIntervalRef.current = null;
     }
-  }, [phase]);
+    if (flattenIntervalRef.current) {
+      clearInterval(flattenIntervalRef.current);
+      flattenIntervalRef.current = null;
+    }
+  }, []);
 
   // Reset activation when activation type changes
   useEffect(() => {
-    if (phase === 'activation' || phase === 'pooling') {
-      resetActivation();
-    }
-  }, [activationType]);
+    // Only reset if we're past convolution phase
+    resetActivation();
+  }, [activationType, resetActivation]);
 
   // Reset pooling when pooling type changes (but keep convolution results)
+  // Note: Not resetting phase here - phase management is handled separately
   const resetPooling = useCallback(() => {
     setPoolStep(0);
     setPooledMap([]);
+    setFlattenStep(0);
+    setFlattenedVector([]);
     setCurrentPoolStep(null);
-    if (phase === 'pooling') {
-      // Stay in pooling phase but reset its state
-    }
     setIsPlaying(false);
     setIsPoolingPlaying(false);
+    setIsFlattenPlaying(false);
     if (playIntervalRef.current) {
       clearInterval(playIntervalRef.current);
       playIntervalRef.current = null;
@@ -385,12 +483,32 @@ export function useCNNVisualization() {
       clearInterval(poolingIntervalRef.current);
       poolingIntervalRef.current = null;
     }
-  }, [phase]);
+    if (flattenIntervalRef.current) {
+      clearInterval(flattenIntervalRef.current);
+      flattenIntervalRef.current = null;
+    }
+  }, []);
 
   // Reset pooling when pooling type changes
   useEffect(() => {
     resetPooling();
   }, [poolingType, resetPooling]);
+
+  // Reset flatten (keeps all previous layer results)
+  const resetFlatten = useCallback(() => {
+    setFlattenStep(0);
+    setFlattenedVector([]);
+    setIsFlattenPlaying(false);
+    if (flattenIntervalRef.current) {
+      clearInterval(flattenIntervalRef.current);
+      flattenIntervalRef.current = null;
+    }
+  }, []);
+
+  // Reset flatten when flatten source changes
+  useEffect(() => {
+    resetFlatten();
+  }, [flattenSource, resetFlatten]);
 
   // Step forward
   const step = useCallback(() => {
@@ -780,6 +898,285 @@ export function useCNNVisualization() {
     }
   }, [convStep, totalConvSteps]);
 
+  // NEW: Function to start flatten phase
+  const startFlatten = useCallback(() => {
+    // Set phase to flatten - the UI already prevents calling this when convolution isn't complete
+    setPhase('flatten');
+  }, []);
+
+  // NEW: Step through flatten one row at a time
+  const stepFlatten = useCallback(() => {
+    if (phase !== 'flatten') return;
+    
+    const sourceMap = flattenInputMap;
+    const sourceSize = flattenInputSize;
+    
+    // Ensure we have valid source data
+    if (sourceSize === 0) {
+      setIsFlattenPlaying(false);
+      return;
+    }
+    
+    if (flattenStep >= sourceSize) {
+      setIsFlattenPlaying(false);
+      return;
+    }
+    
+    // Get the current row
+    const currentRow = flattenStep;
+    const rowValues: number[] = [];
+    
+    for (let col = 0; col < sourceSize; col++) {
+      const val = sourceMap[currentRow]?.[col];
+      // Convert null/undefined to 0
+      rowValues.push(val !== null && val !== undefined ? val : 0);
+    }
+    
+    // Append this row's values to the flattened vector
+    setFlattenedVector(prev => [...prev, ...rowValues]);
+    setFlattenStep(prev => prev + 1);
+    
+    // Check if flatten is complete
+    if (flattenStep + 1 >= sourceSize) {
+      setIsFlattenPlaying(false);
+      if (flattenIntervalRef.current) {
+        clearInterval(flattenIntervalRef.current);
+        flattenIntervalRef.current = null;
+      }
+    }
+  }, [phase, flattenStep, flattenInputMap, flattenInputSize]);
+
+  // NEW: Toggle flatten play/pause
+  const toggleFlattenPlay = useCallback(() => {
+    if (isFlattenPlaying) {
+      setIsFlattenPlaying(false);
+      if (flattenIntervalRef.current) {
+        clearInterval(flattenIntervalRef.current);
+        flattenIntervalRef.current = null;
+      }
+    } else {
+      setIsFlattenPlaying(true);
+    }
+  }, [isFlattenPlaying]);
+
+  // Auto-step flatten when flatten is playing
+  useEffect(() => {
+    if (isFlattenPlaying && phase === 'flatten') {
+      flattenIntervalRef.current = setInterval(() => {
+        stepFlatten();
+      }, 100); // Slightly slower for better visibility
+    }
+    
+    return () => {
+      if (flattenIntervalRef.current) {
+        clearInterval(flattenIntervalRef.current);
+      }
+    };
+  }, [isFlattenPlaying, stepFlatten, phase]);
+
+  // ========================================
+  // DENSE LAYER FUNCTIONS
+  // ========================================
+
+  // Initialize random weights using Xavier/Glorot initialization
+  const initializeDenseWeights = useCallback((inputSize: number, outputSize: number) => {
+    const scale = Math.sqrt(2.0 / (inputSize + outputSize));
+    const weights: number[][] = [];
+    const biases: number[] = [];
+    
+    for (let i = 0; i < outputSize; i++) {
+      const neuronWeights: number[] = [];
+      for (let j = 0; j < inputSize; j++) {
+        // Random between -scale and +scale
+        neuronWeights.push((Math.random() * 2 - 1) * scale);
+      }
+      weights.push(neuronWeights);
+      biases.push((Math.random() * 2 - 1) * 0.1); // Small random bias
+    }
+    
+    setDenseWeights(weights);
+    setDenseBiases(biases);
+    setDenseNeuronOutputs(Array(outputSize).fill(null));
+    setDenseActivatedOutputs(Array(outputSize).fill(null));
+  }, []);
+
+  // Reset dense layer (keeps flatten results)
+  const resetDense = useCallback(() => {
+    setDenseStep(0);
+    setDenseRunningSum(0);
+    setDenseCurrentMultiplication(null);
+    setDenseNeuronOutputs(prev => prev.map(() => null));
+    setDenseActivatedOutputs(prev => prev.map(() => null));
+    setIsDensePlaying(false);
+    if (denseIntervalRef.current) {
+      clearInterval(denseIntervalRef.current);
+      denseIntervalRef.current = null;
+    }
+  }, []);
+
+  // Reset dense when layer size changes
+  useEffect(() => {
+    if (flattenedVector.length > 0) {
+      initializeDenseWeights(flattenedVector.length, denseLayerSize);
+    }
+    resetDense();
+  }, [denseLayerSize, flattenedVector.length, initializeDenseWeights, resetDense]);
+
+  // Reset dense when changing selected neuron (reset step but keep weights)
+  useEffect(() => {
+    setDenseStep(0);
+    setDenseRunningSum(0);
+    setDenseCurrentMultiplication(null);
+    setIsDensePlaying(false);
+    if (denseIntervalRef.current) {
+      clearInterval(denseIntervalRef.current);
+      denseIntervalRef.current = null;
+    }
+  }, [selectedNeuron]);
+
+  // Apply dense activation function
+  const applyDenseActivation = useCallback((values: (number | null)[]): (number | null)[] => {
+    const validValues = values.filter((v): v is number => v !== null);
+    
+    switch (denseActivationType) {
+      case 'none':
+        return values;
+      case 'relu':
+        return values.map(v => v !== null ? Math.max(0, v) : null);
+      case 'softmax': {
+        if (validValues.length === 0) return values;
+        const maxVal = Math.max(...validValues);
+        const expValues = validValues.map(v => Math.exp((v - maxVal)));
+        const sumExp = expValues.reduce((a, b) => a + b, 0);
+        const softmaxValues = expValues.map(v => v / sumExp);
+        
+        let softmaxIdx = 0;
+        return values.map(v => {
+          if (v !== null) {
+            return softmaxValues[softmaxIdx++];
+          }
+          return null;
+        });
+      }
+      default:
+        return values;
+    }
+  }, [denseActivationType]);
+
+  // Function to start dense phase
+  const startDense = useCallback(() => {
+    if (flattenStep >= totalFlattenSteps && flattenedVector.length > 0) {
+      setPhase('dense');
+      // Initialize weights if not already done
+      if (denseWeights.length === 0) {
+        initializeDenseWeights(flattenedVector.length, denseLayerSize);
+      }
+    }
+  }, [flattenStep, totalFlattenSteps, flattenedVector.length, denseWeights.length, initializeDenseWeights, denseLayerSize]);
+
+  // Step through dense computation for selected neuron
+  const stepDense = useCallback(() => {
+    if (phase !== 'dense') return;
+    
+    const inputSize = flattenedVector.length;
+    if (inputSize === 0 || denseWeights.length === 0) return;
+    
+    // If current neuron is already complete, stop
+    if (denseStep >= inputSize) {
+      setIsDensePlaying(false);
+      return;
+    }
+    
+    // Calculate current multiplication
+    const inputVal = flattenedVector[denseStep];
+    const weightVal = denseWeights[selectedNeuron]?.[denseStep] || 0;
+    const product = inputVal * weightVal;
+    
+    setDenseCurrentMultiplication(product);
+    
+    // Update running sum
+    const newRunningSum = denseRunningSum + product;
+    setDenseRunningSum(newRunningSum);
+    
+    // Advance step
+    const newStep = denseStep + 1;
+    setDenseStep(newStep);
+    
+    // If this was the last step, mark neuron as complete
+    if (newStep >= inputSize) {
+      const finalOutput = newRunningSum + denseBiases[selectedNeuron];
+      
+      setDenseNeuronOutputs(prev => {
+        const updated = [...prev];
+        updated[selectedNeuron] = finalOutput;
+        
+        // Check if all neurons are computed and apply activation
+        const allComputed = updated.every(v => v !== null);
+        if (allComputed) {
+          // Apply activation to all outputs
+          setTimeout(() => {
+            setDenseActivatedOutputs(applyDenseActivation(updated));
+          }, 0);
+        }
+        
+        return updated;
+      });
+      
+      setIsDensePlaying(false);
+    }
+  }, [phase, flattenedVector, denseWeights, denseBiases, denseStep, denseRunningSum, selectedNeuron, applyDenseActivation]);
+
+  // Toggle dense play/pause
+  const toggleDensePlay = useCallback(() => {
+    if (isDensePlaying) {
+      setIsDensePlaying(false);
+      if (denseIntervalRef.current) {
+        clearInterval(denseIntervalRef.current);
+        denseIntervalRef.current = null;
+      }
+    } else {
+      setIsDensePlaying(true);
+    }
+  }, [isDensePlaying]);
+
+  // Auto-step dense when playing
+  useEffect(() => {
+    if (isDensePlaying && phase === 'dense') {
+      denseIntervalRef.current = setInterval(() => {
+        stepDense();
+      }, 75);
+    }
+    
+    return () => {
+      if (denseIntervalRef.current) {
+        clearInterval(denseIntervalRef.current);
+      }
+    };
+  }, [isDensePlaying, stepDense, phase]);
+
+  // Recompute activated outputs when activation type changes
+  useEffect(() => {
+    if (denseNeuronOutputs.some(v => v !== null)) {
+      setDenseActivatedOutputs(applyDenseActivation(denseNeuronOutputs));
+    }
+  }, [denseActivationType, denseNeuronOutputs, applyDenseActivation]);
+
+  // Check if current neuron computation is complete
+  const isNeuronComplete = denseStep >= flattenedVector.length;
+  
+  // Check if all neurons are computed
+  const isDenseComplete = denseNeuronOutputs.every(v => v !== null);
+
+  // Dense status indicator
+  const denseStatus = useMemo(() => {
+    if (flattenStep < totalFlattenSteps) return 'waiting';
+    if (denseStep === 0 && phase !== 'dense') return 'waiting';
+    if (isDenseComplete) return 'completed';
+    if (phase === 'dense' || isDensePlaying) return 'running';
+    if (denseStep > 0) return 'running';
+    return 'waiting';
+  }, [flattenStep, totalFlattenSteps, denseStep, phase, isDensePlaying, isDenseComplete]);
+
   // Status indicators for each stage
   const convolutionStatus = useMemo(() => {
     if (convStep === 0) return 'waiting';
@@ -806,6 +1203,16 @@ export function useCNNVisualization() {
     return 'waiting';
   }, [convStep, totalConvSteps, poolStep, totalPoolSteps, phase, isPoolingPlaying, poolingType]);
 
+  // Flatten status indicator
+  const flattenStatus = useMemo(() => {
+    if (convStep < totalConvSteps) return 'waiting';
+    if (flattenStep === 0 && phase !== 'flatten') return 'waiting';
+    if (flattenStep < totalFlattenSteps && (phase === 'flatten' || isFlattenPlaying)) return 'running';
+    if (flattenStep >= totalFlattenSteps) return 'completed';
+    if (flattenStep > 0) return 'running';
+    return 'waiting';
+  }, [convStep, totalConvSteps, flattenStep, totalFlattenSteps, phase, isFlattenPlaying]);
+
   // Check if complete - handle global average pooling separately (only 1 step)
   const isComplete = phase === 'pooling' && (
     poolingType === 'globalAverage' ? poolStep >= 1 : poolStep >= totalPoolSteps
@@ -813,6 +1220,9 @@ export function useCNNVisualization() {
 
   // Check if pooling is complete (for dedicated pooling controls)
   const isPoolingComplete = poolingType === 'globalAverage' ? poolStep >= 1 : poolStep >= totalPoolSteps;
+
+  // Check if flatten is complete
+  const isFlattenComplete = flattenStep >= totalFlattenSteps;
 
   return {
     // State
@@ -878,12 +1288,54 @@ export function useCNNVisualization() {
     // NEW: Phase control functions
     startActivation,
     startPooling,
+    startFlatten,
     
     // NEW: Status indicators
     convolutionStatus,
     activationStatus,
     poolingStatus,
+    flattenStatus,
     isConvolutionComplete: convStep >= totalConvSteps,
+    
+    // NEW: Flatten layer state and controls
+    flattenSource,
+    setFlattenSource,
+    flattenedVector,
+    flattenStep,
+    totalFlattenSteps,
+    flattenInputMap,
+    flattenInputSize,
+    totalFlattenCells,
+    isFlattenPlaying,
+    isFlattenComplete,
+    stepFlatten,
+    toggleFlattenPlay,
+    resetFlatten,
+    
+    // NEW: Dense layer state and controls
+    denseLayerSize,
+    setDenseLayerSize,
+    selectedNeuron,
+    setSelectedNeuron,
+    denseWeights,
+    denseBiases,
+    denseStep,
+    denseRunningSum,
+    denseCurrentMultiplication,
+    denseNeuronOutputs,
+    denseActivatedOutputs,
+    isDensePlaying,
+    isDenseComplete,
+    isNeuronComplete,
+    denseActivationType,
+    setDenseActivationType,
+    showTopK,
+    setShowTopK,
+    denseStatus,
+    startDense,
+    stepDense,
+    toggleDensePlay,
+    resetDense,
     
     // Actions
     setSelectedClass,

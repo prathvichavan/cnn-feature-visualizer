@@ -27,7 +27,7 @@ interface PoolingVisualizationProps {
   poolStep: number;
   totalSteps: number;
   size: number;
-  phase: 'convolution' | 'activation' | 'pooling';
+  phase: 'convolution' | 'activation' | 'pooling' | 'flatten' | 'dense';
   // Pooling type controls
   poolingType: PoolingType;
   onPoolingTypeChange: (type: PoolingType) => void;

@@ -6,8 +6,10 @@ import { ConvolutionVisualization } from '@/components/ConvolutionVisualization'
 import { FeatureMapDisplay } from '@/components/FeatureMapDisplay';
 import { ActivationVisualization } from '@/components/ActivationVisualization';
 import { PoolingVisualization } from '@/components/PoolingVisualization';
+import { FlattenVisualization } from '@/components/FlattenVisualization';
+import { DenseLayerVisualization } from '@/components/DenseLayerVisualization';
 import { ExplanationPanel } from '@/components/ExplanationPanel';
-import { useCNNVisualization, PoolingType } from '@/hooks/useCNNVisualization';
+import { useCNNVisualization, PoolingType, FlattenSourceType, DenseActivationType } from '@/hooks/useCNNVisualization';
 import { mnistClassLabels, fashionMnistClassLabels } from '@/data/datasets';
 
 const Index = () => {
@@ -72,11 +74,50 @@ const Index = () => {
     // NEW: Phase control functions
     startActivation,
     startPooling,
+    startFlatten,
     // NEW: Status indicators
     convolutionStatus,
     activationStatus,
     poolingStatus,
+    flattenStatus,
     isConvolutionComplete,
+    // NEW: Flatten layer
+    flattenSource,
+    setFlattenSource,
+    flattenedVector,
+    flattenStep,
+    totalFlattenSteps,
+    flattenInputMap,
+    flattenInputSize,
+    isFlattenPlaying,
+    isFlattenComplete,
+    stepFlatten,
+    toggleFlattenPlay,
+    resetFlatten,
+    // NEW: Dense layer
+    denseLayerSize,
+    setDenseLayerSize,
+    selectedNeuron,
+    setSelectedNeuron,
+    denseWeights,
+    denseBiases,
+    denseStep,
+    denseRunningSum,
+    denseCurrentMultiplication,
+    denseNeuronOutputs,
+    denseActivatedOutputs,
+    isDensePlaying,
+    isDenseComplete,
+    isNeuronComplete,
+    denseActivationType,
+    setDenseActivationType,
+    showTopK,
+    setShowTopK,
+    denseStatus,
+    startDense,
+    stepDense,
+    toggleDensePlay,
+    resetDense,
   } = useCNNVisualization();
 
   // --- INTERACTIVE FEATURE: Highlight input region on feature map hover ---
@@ -432,6 +473,61 @@ const Index = () => {
           status={poolingStatus}
           isConvolutionComplete={isConvolutionComplete}
           onStartPooling={startPooling}
+        />
+
+        {/* Flatten Layer */}
+        <FlattenVisualization
+          featureMap={displayFeatureMap}
+          activatedMap={displayedActivationMap.length > 0 
+            ? displayedActivationMap 
+            : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
+          pooledMap={displayPooledMap}
+          flattenedVector={flattenedVector}
+          flattenStep={flattenStep}
+          totalFlattenSteps={totalFlattenSteps}
+          currentFlattenRow={flattenStep}
+          flattenSource={flattenSource}
+          onFlattenSourceChange={setFlattenSource}
+          onStep={stepFlatten}
+          onTogglePlay={toggleFlattenPlay}
+          onReset={resetFlatten}
+          isPlaying={isFlattenPlaying}
+          isFlattenComplete={isFlattenComplete}
+          status={flattenStatus}
+          isConvolutionComplete={isConvolutionComplete}
+          onStartFlatten={startFlatten}
+          phase={phase}
+        />
+
+        {/* Dense (Fully Connected) Layer */}
+        <DenseLayerVisualization
+          flattenedVector={flattenedVector}
+          isFlattenComplete={isFlattenComplete}
+          denseLayerSize={denseLayerSize}
+          selectedNeuron={selectedNeuron}
+          weights={denseWeights}
+          biases={denseBiases}
+          denseStep={denseStep}
+          runningSum={denseRunningSum}
+          currentMultiplication={denseCurrentMultiplication}
+          neuronOutputs={denseNeuronOutputs}
+          activatedOutputs={denseActivatedOutputs}
+          onDenseLayerSizeChange={setDenseLayerSize}
+          onSelectedNeuronChange={setSelectedNeuron}
+          onStep={stepDense}
+          onTogglePlay={toggleDensePlay}
+          onReset={resetDense}
+          isPlaying={isDensePlaying}
+          isDenseComplete={isDenseComplete}
+          isNeuronComplete={isNeuronComplete}
+          denseActivationType={denseActivationType}
+          onDenseActivationTypeChange={setDenseActivationType}
+          status={denseStatus}
+          onStartDense={startDense}
+          phase={phase}
+          showTopK={showTopK}
+          onShowTopKChange={setShowTopK}
+          topK={20}
         />
 
         {/* Explanation Panel */}
