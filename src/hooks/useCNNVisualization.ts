@@ -1102,29 +1102,36 @@ export function useCNNVisualization() {
     const newStep = denseStep + 1;
     setDenseStep(newStep);
     
-    // If this was the last step, mark neuron as complete
+    // If this was the last step, mark neuron as complete AND compute all other neurons
     if (newStep >= inputSize) {
       const finalOutput = newRunningSum + denseBiases[selectedNeuron];
       
-      setDenseNeuronOutputs(prev => {
-        const updated = [...prev];
-        updated[selectedNeuron] = finalOutput;
-        
-        // Check if all neurons are computed and apply activation
-        const allComputed = updated.every(v => v !== null);
-        if (allComputed) {
-          // Apply activation to all outputs
-          setTimeout(() => {
-            setDenseActivatedOutputs(applyDenseActivation(updated));
-          }, 0);
+      // Compute ALL neuron outputs at once (not just the selected one)
+      const allOutputs: number[] = [];
+      for (let n = 0; n < denseLayerSize; n++) {
+        if (n === selectedNeuron) {
+          // Use the step-by-step computed value for selected neuron
+          allOutputs.push(finalOutput);
+        } else {
+          // Compute other neurons instantly
+          let sum = 0;
+          for (let i = 0; i < inputSize; i++) {
+            sum += flattenedVector[i] * (denseWeights[n]?.[i] || 0);
+          }
+          allOutputs.push(sum + denseBiases[n]);
         }
-        
-        return updated;
-      });
+      }
+      
+      setDenseNeuronOutputs(allOutputs);
+      
+      // Apply activation to all outputs
+      setTimeout(() => {
+        setDenseActivatedOutputs(applyDenseActivation(allOutputs));
+      }, 0);
       
       setIsDensePlaying(false);
     }
-  }, [phase, flattenedVector, denseWeights, denseBiases, denseStep, denseRunningSum, selectedNeuron, applyDenseActivation]);
+  }, [phase, flattenedVector, denseWeights, denseBiases, denseStep, denseRunningSum, selectedNeuron, applyDenseActivation, denseLayerSize]);
 
   // Toggle dense play/pause
   const toggleDensePlay = useCallback(() => {
