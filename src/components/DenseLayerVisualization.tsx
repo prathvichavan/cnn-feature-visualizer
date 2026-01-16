@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, StepForward, PlayCircle } from 'lucide-react';
+import { Play, Pause, RotateCcw, StepForward, PlayCircle, Trophy } from 'lucide-react';
 
 // Dense layer activation types
 export type DenseActivationType = 'none' | 'relu' | 'softmax';
@@ -94,6 +94,32 @@ export function DenseLayerVisualization({
   const inputSize = flattenedVector.length;
   const currentWeights = weights[selectedNeuron] || [];
   const currentBias = biases[selectedNeuron] || 0;
+
+  // Calculate predicted neuron (argmax of softmax probabilities)
+  const predictedNeuron = useMemo(() => {
+    if (denseActivationType !== 'softmax' || !isDenseComplete) return null;
+    if (!activatedOutputs.length || activatedOutputs.every(v => v === null)) return null;
+    
+    let maxIdx = 0;
+    let maxVal = -Infinity;
+    activatedOutputs.forEach((val, idx) => {
+      if (val !== null && val > maxVal) {
+        maxVal = val;
+        maxIdx = idx;
+      }
+    });
+    return maxIdx;
+  }, [activatedOutputs, denseActivationType, isDenseComplete]);
+
+  // Auto-select predicted neuron when softmax completes
+  useEffect(() => {
+    if (predictedNeuron !== null && isDenseComplete && denseActivationType === 'softmax') {
+      onSelectedNeuronChange(predictedNeuron);
+    }
+  }, [predictedNeuron, isDenseComplete, denseActivationType]);
+
+  // Check if user is inspecting a non-predicted neuron
+  const isInspectingNonPredicted = predictedNeuron !== null && selectedNeuron !== predictedNeuron;
 
   // Calculate which inputs have the most influence (for top-k display)
   const topInfluentialInputs = useMemo(() => {
@@ -196,9 +222,19 @@ export function DenseLayerVisualization({
           <span className={`px-2 py-0.5 text-xs font-medium rounded border ${getStatusBadgeStyle()}`}>
             {status === 'waiting' ? 'Waiting' : status === 'running' ? 'Running' : 'Completed'}
           </span>
+          {/* Prediction badge */}
+          {isDenseComplete && denseActivationType === 'softmax' && predictedNeuron !== null && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded bg-green-500 text-white flex items-center gap-1">
+              <Trophy className="w-3 h-3" />
+              Predicted: N{predictedNeuron + 1}
+            </span>
+          )}
         </div>
-        <div className="text-white/80 text-sm">
-          Neuron {selectedNeuron + 1} / {denseLayerSize}
+        <div className="text-white/80 text-sm flex items-center gap-2">
+          <span>Viewing: Neuron {selectedNeuron + 1}</span>
+          {isInspectingNonPredicted && (
+            <span className="text-yellow-200 text-xs">(inspecting, not predicted)</span>
+          )}
         </div>
       </div>
 
@@ -605,6 +641,7 @@ export function DenseLayerVisualization({
             >
               {(denseActivationType !== 'none' ? activatedOutputs : neuronOutputs).map((output, idx) => {
                 const isSelected = idx === selectedNeuron;
+                const isPredicted = idx === predictedNeuron;
                 const maxOut = Math.max(...(denseActivationType !== 'none' ? activatedOutputs : neuronOutputs).filter(v => v !== null).map(v => Math.abs(v!)), 1);
                 const colors = getValueColor(output, maxOut);
                 
@@ -617,9 +654,27 @@ export function DenseLayerVisualization({
                       alignItems: 'center',
                       gap: '4px',
                       cursor: 'pointer',
+                      position: 'relative',
                     }}
                     onClick={() => onSelectedNeuronChange(idx)}
                   >
+                    {/* Predicted badge */}
+                    {isPredicted && denseActivationType === 'softmax' && (
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          right: '-4px',
+                          backgroundColor: '#22c55e',
+                          borderRadius: '9999px',
+                          padding: '2px',
+                          zIndex: 10,
+                        }}
+                        title="Predicted Output"
+                      >
+                        <Trophy style={{ width: '10px', height: '10px', color: 'white' }} />
+                      </div>
+                    )}
                     <div
                       style={{
                         display: 'flex',
@@ -632,15 +687,23 @@ export function DenseLayerVisualization({
                         borderRadius: '0.25rem',
                         fontSize: '0.7rem',
                         fontFamily: 'monospace',
-                        outline: isSelected ? '2px solid #f97316' : 'none',
+                        outline: isSelected 
+                          ? '2px solid #f97316' 
+                          : isPredicted && denseActivationType === 'softmax'
+                            ? '2px solid #22c55e'
+                            : 'none',
                         outlineOffset: '2px',
                       }}
-                      title={`Neuron ${idx + 1}: ${formatValue(output, 6)}`}
+                      title={`Neuron ${idx + 1}: ${formatValue(output, 6)}${isPredicted ? ' (Predicted)' : ''}`}
                     >
                       {formatValue(output, 3)}
                     </div>
-                    <span style={{ fontSize: '0.6rem', color: 'hsl(var(--muted-foreground))' }}>
-                      N{idx + 1}
+                    <span style={{ 
+                      fontSize: '0.6rem', 
+                      color: isPredicted ? '#22c55e' : 'hsl(var(--muted-foreground))',
+                      fontWeight: isPredicted ? 600 : 400,
+                    }}>
+                      N{idx + 1}{isPredicted && denseActivationType === 'softmax' ? ' ★' : ''}
                     </span>
                   </div>
                 );
@@ -652,11 +715,17 @@ export function DenseLayerVisualization({
         {/* Softmax Context: Logits vs Probabilities Table */}
         {isDenseComplete && denseActivationType === 'softmax' && (
           <div className="space-y-2 pt-2 border-t border-border">
-            <h4 className="text-sm font-medium text-foreground">
+            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
               Softmax Probability Distribution
+              {predictedNeuron !== null && (
+                <span className="text-xs font-normal bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded flex items-center gap-1">
+                  <Trophy className="w-3 h-3" />
+                  Predicted: Neuron {predictedNeuron + 1}
+                </span>
+              )}
             </h4>
             <p className="text-xs text-muted-foreground mb-2">
-              Softmax converts all output neuron scores into a probability distribution that sums to 1.
+              After Softmax, the neuron with the highest probability is selected as the predicted output.
             </p>
             <div className="bg-muted/20 rounded-lg border border-border overflow-hidden">
               <table className="w-full text-xs">
@@ -670,23 +739,33 @@ export function DenseLayerVisualization({
                   {neuronOutputs.map((logit, idx) => {
                     const prob = activatedOutputs[idx];
                     const isSelected = idx === selectedNeuron;
+                    const isPredicted = idx === predictedNeuron;
                     return (
                       <tr 
                         key={idx} 
                         className={`border-b border-border/50 cursor-pointer hover:bg-muted/30 transition-colors ${
-                          isSelected ? 'bg-orange-100 dark:bg-orange-950/40 border-l-2 border-l-orange-500' : ''
+                          isPredicted 
+                            ? 'bg-green-50 dark:bg-green-950/30 border-l-2 border-l-green-500' 
+                            : isSelected 
+                              ? 'bg-orange-50 dark:bg-orange-950/30 border-l-2 border-l-orange-400' 
+                              : ''
                         }`}
                         onClick={() => onSelectedNeuronChange(idx)}
                       >
                         <td className="px-3 py-1.5">
-                          <span className={`font-medium ${isSelected ? 'text-orange-600 font-semibold' : 'text-foreground'}`}>
+                          <span className={`font-medium ${isPredicted ? 'text-green-600 font-semibold' : isSelected ? 'text-orange-600' : 'text-foreground'}`}>
                             Neuron {idx + 1}
-                            {isSelected && <span className="ml-1 text-[10px]">← selected</span>}
+                            {isPredicted && (
+                              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] bg-green-500 text-white px-1 rounded">
+                                <Trophy className="w-2.5 h-2.5" /> Predicted
+                              </span>
+                            )}
+                            {isSelected && !isPredicted && <span className="ml-1 text-[10px] text-orange-500">← inspecting</span>}
                           </span>
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           <span className={`font-mono font-semibold ${
-                            isSelected ? 'text-orange-600' : 'text-green-600'
+                            isPredicted ? 'text-green-600' : isSelected ? 'text-orange-600' : 'text-muted-foreground'
                           }`}>
                             {prob !== null && prob !== undefined 
                               ? (prob < 0.0001 && prob > 0 
@@ -714,7 +793,7 @@ export function DenseLayerVisualization({
               </table>
             </div>
             <p className="text-xs text-muted-foreground italic">
-              All probabilities sum to 1 (100%). Click any row to inspect that neuron's computation.
+              All probabilities sum to 1. Click any row to inspect that neuron's computation.
             </p>
           </div>
         )}
