@@ -652,21 +652,18 @@ export function DenseLayerVisualization({
         {/* Softmax Context: Logits vs Probabilities Table */}
         {isDenseComplete && denseActivationType === 'softmax' && (
           <div className="space-y-2 pt-2 border-t border-border">
-            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-              <span>Softmax Context (All Output Neurons)</span>
-              <span className="text-xs font-normal text-muted-foreground">— vector-level operation</span>
+            <h4 className="text-sm font-medium text-foreground">
+              Softmax Probability Distribution
             </h4>
             <p className="text-xs text-muted-foreground mb-2">
-              Softmax converts raw logits (z) into probabilities (p) using: 
-              <span className="font-mono ml-1">p_i = e^(z_i) / Σ e^(z_j)</span>
+              Softmax converts all output neuron scores into a probability distribution that sums to 1.
             </p>
             <div className="bg-muted/20 rounded-lg border border-border overflow-hidden">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-muted/40 border-b border-border">
                     <th className="px-3 py-2 text-left font-medium text-muted-foreground">Neuron</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Logit (z)</th>
-                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Probability (p)</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Probability</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -677,18 +674,15 @@ export function DenseLayerVisualization({
                       <tr 
                         key={idx} 
                         className={`border-b border-border/50 cursor-pointer hover:bg-muted/30 transition-colors ${
-                          isSelected ? 'bg-orange-50 dark:bg-orange-950/30' : ''
+                          isSelected ? 'bg-orange-100 dark:bg-orange-950/40 border-l-2 border-l-orange-500' : ''
                         }`}
                         onClick={() => onSelectedNeuronChange(idx)}
                       >
                         <td className="px-3 py-1.5">
-                          <span className={`font-medium ${isSelected ? 'text-orange-600' : 'text-foreground'}`}>
+                          <span className={`font-medium ${isSelected ? 'text-orange-600 font-semibold' : 'text-foreground'}`}>
                             Neuron {idx + 1}
                             {isSelected && <span className="ml-1 text-[10px]">← selected</span>}
                           </span>
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-mono text-muted-foreground">
-                          {formatValue(logit, 4)}
                         </td>
                         <td className="px-3 py-1.5 text-right">
                           <span className={`font-mono font-semibold ${
@@ -697,7 +691,7 @@ export function DenseLayerVisualization({
                             {prob !== null && prob !== undefined 
                               ? (prob < 0.0001 && prob > 0 
                                   ? prob.toExponential(2) 
-                                  : (prob * 100).toFixed(2) + '%')
+                                  : prob.toFixed(4))
                               : '-'
                             }
                           </span>
@@ -708,11 +702,10 @@ export function DenseLayerVisualization({
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/40">
-                    <td className="px-3 py-2 font-medium text-muted-foreground">Total</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                    <td className="px-3 py-2 font-medium text-muted-foreground">Total (Σ)</td>
                     <td className="px-3 py-2 text-right font-mono font-semibold text-foreground">
                       {activatedOutputs.filter(v => v !== null).length > 0 
-                        ? '100.00%' 
+                        ? '1.0000' 
                         : '-'
                       }
                     </td>
