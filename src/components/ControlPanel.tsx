@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, StepForward } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Play, Pause, RotateCcw, StepForward, Info } from 'lucide-react';
 import { FilterType, mnistClassLabels, fashionMnistClassLabels, DatasetType } from '@/data/datasets';
 
 interface ControlPanelProps {
@@ -42,6 +43,7 @@ export function ControlPanel({
     { value: 'bottomEdge', label: 'Bottom Edge' },
     { value: 'leftEdge', label: 'Left Edge' },
     { value: 'rightEdge', label: 'Right Edge' },
+    { value: 'centerEdge', label: 'Center Edge' },
   ];
 
   return (
@@ -114,9 +116,46 @@ export function ControlPanel({
 
         {/* Filter Selector */}
         <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-2">
-            Edge Filter
-          </label>
+          <div className="flex items-center gap-1 mb-2">
+            <label className="text-sm font-medium text-muted-foreground">
+              Edge Filter
+            </label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="p-0.5 rounded-full hover:bg-secondary transition-colors"
+                  title="Filter usage hints"
+                >
+                  <Info className="w-3.5 h-3.5 text-primary" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3" align="start">
+                <h4 className="font-semibold text-sm mb-2">MNIST Filter Usage Hints</h4>
+                <ul className="space-y-1.5 text-xs text-muted-foreground">
+                  <li className="flex gap-2">
+                    <span className="font-medium text-foreground">Top Edge:</span>
+                    <span>upper strokes (7, 5, 2)</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-medium text-foreground">Bottom Edge:</span>
+                    <span>bottom/base strokes (2, 3, 5, 8, 9)</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-medium text-foreground">Left Edge:</span>
+                    <span>left boundary strokes (1, 4, 6, 9)</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-medium text-foreground">Right Edge:</span>
+                    <span>right boundary strokes (2, 3, 5, 7)</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-medium text-foreground">Center Edge:</span>
+                    <span>curves & corners (0, 6, 8, 9)</span>
+                  </li>
+                </ul>
+              </PopoverContent>
+            </Popover>
+          </div>
           <select
             value={filterType}
             onChange={(e) => onFilterChange(e.target.value as FilterType)}

@@ -223,6 +223,10 @@ export function useCNNVisualization() {
     reset();
   }, [selectedClass, filterType, dataset, padding, stride, reset]);
 
+  // NEW: Pooling-specific playing state
+  const [isPoolingPlaying, setIsPoolingPlaying] = useState(false);
+  const poolingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Reset pooling when pooling type changes (but keep convolution results)
   const resetPooling = useCallback(() => {
     setPoolStep(0);
@@ -232,9 +236,14 @@ export function useCNNVisualization() {
       // Stay in pooling phase but reset its state
     }
     setIsPlaying(false);
+    setIsPoolingPlaying(false);
     if (playIntervalRef.current) {
       clearInterval(playIntervalRef.current);
       playIntervalRef.current = null;
+    }
+    if (poolingIntervalRef.current) {
+      clearInterval(poolingIntervalRef.current);
+      poolingIntervalRef.current = null;
     }
   }, [phase]);
 
@@ -335,10 +344,111 @@ export function useCNNVisualization() {
       
       if (poolStep + 1 >= totalPoolSteps) {
         setIsPlaying(false);
+        setIsPoolingPlaying(false);
       }
     }
   }, [phase, convStep, poolStep, totalConvSteps, totalPoolSteps, convOutputSize, poolOutputSize, 
       performConvolution, performPooling, performGlobalAveragePooling, featureMap, poolingType]);
+
+  // NEW: Step through pooling only (for dedicated pooling controls)
+  const stepPooling = useCallback(() => {
+    if (phase !== 'pooling') return;
+    
+    // Handle Global Average Pooling separately - it's a single step
+    if (poolingType === 'globalAverage') {
+      if (poolStep >= 1) {
+        setIsPoolingPlaying(false);
+        return;
+      }
+      
+      // Use complete feature map for pooling
+      const completeFeatureMap = featureMap.length > 0 ? featureMap : 
+        Array(convOutputSize).fill(null).map((_, r) => 
+          Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
+        );
+      
+      const globalAvg = performGlobalAveragePooling(completeFeatureMap);
+      
+      // Create a special pooling step for global average
+      const stepResult: PoolingStep = {
+        window: completeFeatureMap,
+        maxValue: Math.max(...completeFeatureMap.flat()),
+        minValue: Math.min(...completeFeatureMap.flat()),
+        avgValue: globalAvg,
+        resultValue: globalAvg,
+        row: 0,
+        col: 0,
+        poolingType: 'globalAverage',
+      };
+      
+      setCurrentPoolStep(stepResult);
+      setPooledMap([[globalAvg]]);
+      setPoolStep(1);
+      setIsPoolingPlaying(false);
+      return;
+    }
+    
+    // Standard pooling (max, min, average)
+    if (poolStep >= totalPoolSteps) {
+      setIsPoolingPlaying(false);
+      return;
+    }
+    
+    const row = Math.floor(poolStep / poolOutputSize);
+    const col = poolStep % poolOutputSize;
+    
+    // Use complete feature map for pooling
+    const completeFeatureMap = featureMap.length > 0 ? featureMap : 
+      Array(convOutputSize).fill(null).map((_, r) => 
+        Array(convOutputSize).fill(null).map((_, c) => performConvolution(r, c).sum)
+      );
+    
+    const stepResult = performPooling(row, col, completeFeatureMap, poolingType);
+    
+    setCurrentPoolStep(stepResult);
+    setPooledMap(prev => {
+      const newMap = prev.length === 0 
+        ? Array(poolOutputSize).fill(null).map(() => Array(poolOutputSize).fill(null))
+        : prev.map(r => [...r]);
+      newMap[row][col] = stepResult.resultValue;
+      return newMap;
+    });
+    
+    setPoolStep(prev => prev + 1);
+    
+    if (poolStep + 1 >= totalPoolSteps) {
+      setIsPoolingPlaying(false);
+    }
+  }, [phase, poolStep, totalPoolSteps, poolOutputSize, convOutputSize, 
+      performConvolution, performPooling, performGlobalAveragePooling, featureMap, poolingType]);
+
+  // NEW: Toggle pooling play/pause (dedicated for pooling section)
+  const togglePoolingPlay = useCallback(() => {
+    if (isPoolingPlaying) {
+      setIsPoolingPlaying(false);
+      if (poolingIntervalRef.current) {
+        clearInterval(poolingIntervalRef.current);
+        poolingIntervalRef.current = null;
+      }
+    } else {
+      setIsPoolingPlaying(true);
+    }
+  }, [isPoolingPlaying]);
+
+  // Auto-step pooling when pooling is playing
+  useEffect(() => {
+    if (isPoolingPlaying && phase === 'pooling') {
+      poolingIntervalRef.current = setInterval(() => {
+        stepPooling();
+      }, 50);
+    }
+    
+    return () => {
+      if (poolingIntervalRef.current) {
+        clearInterval(poolingIntervalRef.current);
+      }
+    };
+  }, [isPoolingPlaying, stepPooling, phase]);
 
   // Play/pause animation
   const togglePlay = useCallback(() => {
@@ -373,6 +483,9 @@ export function useCNNVisualization() {
     poolingType === 'globalAverage' ? poolStep >= 1 : poolStep >= totalPoolSteps
   );
 
+  // Check if pooling is complete (for dedicated pooling controls)
+  const isPoolingComplete = poolingType === 'globalAverage' ? poolStep >= 1 : poolStep >= totalPoolSteps;
+
   return {
     // State
     dataset,
@@ -406,6 +519,13 @@ export function useCNNVisualization() {
     // NEW: Pooling type state
     poolingType,
     setPoolingType,
+    
+    // NEW: Dedicated pooling controls
+    isPoolingPlaying,
+    isPoolingComplete,
+    stepPooling,
+    togglePoolingPlay,
+    resetPooling,
     
     // Actions
     setSelectedClass,

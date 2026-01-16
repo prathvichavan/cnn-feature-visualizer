@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { PoolingStep, PoolingType } from '@/hooks/useCNNVisualization';
+import { Button } from '@/components/ui/button';
+import { Play, Pause, RotateCcw, StepForward } from 'lucide-react';
 
 // Pooling type labels and descriptions for UI
 const POOLING_TYPE_LABELS: Record<PoolingType, string> = {
@@ -26,6 +28,12 @@ interface PoolingVisualizationProps {
   // Pooling type controls
   poolingType: PoolingType;
   onPoolingTypeChange: (type: PoolingType) => void;
+  // Step/Play/Reset controls for pooling
+  onStep: () => void;
+  onTogglePlay: () => void;
+  onReset: () => void;
+  isPlaying: boolean;
+  isPoolingComplete: boolean;
   // Advanced interaction props
   onPooledCellHover?: (row: number, col: number) => void;
   onPooledCellLeave?: () => void;
@@ -42,6 +50,11 @@ export function PoolingVisualization({
   phase,
   poolingType,
   onPoolingTypeChange,
+  onStep,
+  onTogglePlay,
+  onReset,
+  isPlaying,
+  isPoolingComplete,
   onPooledCellHover,
   onPooledCellLeave,
   selectedPooledCell,
@@ -189,7 +202,53 @@ export function PoolingVisualization({
 
       {/* Pooling Type Control Panel */}
       <div className="mb-3 p-2 bg-secondary/50 rounded-lg border border-border">
-        <label className="text-xs font-medium text-foreground block mb-2">Pooling Type</label>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <label className="text-xs font-medium text-foreground">Pooling Type</label>
+          {/* Step/Play/Reset Buttons */}
+          <div className="flex gap-1">
+            <Button
+              onClick={onStep}
+              disabled={isPlaying || isPoolingComplete || phase !== 'pooling'}
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs flex items-center gap-1"
+              title={phase !== 'pooling' ? 'Complete convolution first' : 'Step through pooling'}
+            >
+              <StepForward className="w-3 h-3" />
+              Step
+            </Button>
+            <Button
+              onClick={onTogglePlay}
+              disabled={isPoolingComplete || phase !== 'pooling'}
+              variant="default"
+              size="sm"
+              className="h-7 px-2 text-xs flex items-center gap-1"
+              title={phase !== 'pooling' ? 'Complete convolution first' : 'Auto-play pooling'}
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="w-3 h-3" />
+                  Pause
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3" />
+                  Play
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={onReset}
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs flex items-center gap-1"
+              title="Reset pooling (keep convolution)"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Reset
+            </Button>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           {(['max', 'min', 'average', 'globalAverage'] as PoolingType[]).map((type) => (
             <button

@@ -659,24 +659,29 @@ export const fashionMnistClassLabels: Record<number, string> = {
 // Edge detection filters (3x3)
 export const filters = {
   topEdge: [
-    [-1, -1, -1],
-    [1, 1, 1],
-    [0, 0, 0]
+    [-1, -2, -1],
+    [0, 0, 0],
+    [1, 2, 1],
   ],
   bottomEdge: [
+    [1, 2, 1],
     [0, 0, 0],
-    [1, 1, 1],
-    [-1, -1, -1]
+    [-1, -2, -1],
   ],
   leftEdge: [
-    [-1, 1, 0],
-    [-1, 1, 0],
-    [-1, 1, 0]
+    [1, 0, -1],
+    [2, 0, -2],
+    [1, 0, -1],
   ],
   rightEdge: [
-    [0, 1, -1],
-    [0, 1, -1],
-    [0, 1, -1]
+    [-1, 0, 1],
+    [-2, 0, 2],
+    [-1, 0, 1],
+  ],
+  centerEdge: [
+    [0, 1, 0],
+    [1, -4, 1],
+    [0, 1, 0],
   ]
 };
 

@@ -72,20 +72,18 @@ export function ConvolutionVisualization({
           <div className="inline-grid grid-cols-3 gap-1 bg-secondary p-1 rounded">
             {filter.map((row, i) =>
               row.map((val, j) => {
-                // Clamp value to -1.0 to 1.0
-                const clamped = Math.max(-1, Math.min(1, val));
                 return (
                   <div
                     key={`filter-${i}-${j}`}
                     className={`w-9 h-9 flex items-center justify-center text-[10px] font-mono font-bold rounded ${
-                      clamped > 0 
+                      val > 0 
                         ? 'bg-positive/20 text-positive' 
-                        : clamped < 0 
+                        : val < 0 
                           ? 'bg-negative/20 text-negative'
                           : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    {clamped > 0 ? `+${clamped.toFixed(1)}` : clamped.toFixed(1)}
+                    {val > 0 ? `+${val}` : val}
                   </div>
                 );
               })

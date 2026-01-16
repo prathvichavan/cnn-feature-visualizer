@@ -45,6 +45,12 @@ const Index = () => {
     // NEW: Pooling type
     poolingType,
     setPoolingType,
+    // NEW: Dedicated pooling controls
+    isPoolingPlaying,
+    isPoolingComplete,
+    stepPooling,
+    togglePoolingPlay,
+    resetPooling,
   } = useCNNVisualization();
 
   // --- INTERACTIVE FEATURE: Highlight input region on feature map hover ---
@@ -340,6 +346,11 @@ const Index = () => {
           phase={phase}
           poolingType={poolingType}
           onPoolingTypeChange={setPoolingType}
+          onStep={stepPooling}
+          onTogglePlay={togglePoolingPlay}
+          onReset={resetPooling}
+          isPlaying={isPoolingPlaying}
+          isPoolingComplete={isPoolingComplete}
           onPooledCellHover={handlePooledCellSelect}
           onPooledCellLeave={clearPoolingHighlight}
           selectedPooledCell={poolingHighlight ? { row: poolingHighlight.pooledRow, col: poolingHighlight.pooledCol } : null}
