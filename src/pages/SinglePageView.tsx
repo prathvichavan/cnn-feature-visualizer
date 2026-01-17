@@ -1,6 +1,6 @@
-import Navbar from '@/components/layout/Navbar';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { ControlPanel } from '@/components/ControlPanel';
 import { InputImageGrid } from '@/components/InputImageGrid';
 import { ConvolutionVisualization } from '@/components/ConvolutionVisualization';
@@ -10,10 +10,10 @@ import { PoolingVisualization } from '@/components/PoolingVisualization';
 import { FlattenVisualization } from '@/components/FlattenVisualization';
 import { DenseLayerVisualization } from '@/components/DenseLayerVisualization';
 import { ExplanationPanel } from '@/components/ExplanationPanel';
-import { useCNNVisualization, PoolingType, FlattenSourceType, DenseActivationType } from '@/hooks/useCNNVisualization';
+import { useCNNVisualization, PoolingType } from '@/hooks/useCNNVisualization';
 import { mnistClassLabels, fashionMnistClassLabels } from '@/data/datasets';
 
-const Index = () => {
+const SinglePageView = () => {
   const {
     dataset,
     setDataset,
@@ -39,63 +39,60 @@ const Index = () => {
     step,
     togglePlay,
     reset,
-    // NEW: Padding and Stride
+    // Padding and Stride
     padding,
     setPadding,
     stride,
     setStride,
     paddedInputSize,
     originalInputSize,
-    // NEW: Pooling type
+    // Pooling type
     poolingType,
     setPoolingType,
-    // NEW: Activation function
+    // Activation function
     activationType,
     setActivationType,
-    activatedFeatureMap,
     displayedActivationMap,
     activationStep,
     totalActivationSteps,
-    // NEW: Dedicated activation controls
+    // Dedicated activation controls
     isActivationPlaying,
     isActivationComplete,
     stepActivation,
     toggleActivationPlay,
     resetActivation,
-    // NEW: Pooling source
+    // Pooling source
     poolingSource,
     setPoolingSource,
     poolingInputMap,
-    // NEW: Dedicated pooling controls
+    // Dedicated pooling controls
     isPoolingPlaying,
     isPoolingComplete,
     stepPooling,
     togglePoolingPlay,
     resetPooling,
-    // NEW: Phase control functions
+    // Phase control functions
     startActivation,
     startPooling,
     startFlatten,
-    // NEW: Status indicators
+    // Status indicators
     convolutionStatus,
     activationStatus,
     poolingStatus,
     flattenStatus,
     isConvolutionComplete,
-    // NEW: Flatten layer
+    // Flatten layer
     flattenSource,
     setFlattenSource,
     flattenedVector,
     flattenStep,
     totalFlattenSteps,
-    flattenInputMap,
-    flattenInputSize,
     isFlattenPlaying,
     isFlattenComplete,
     stepFlatten,
     toggleFlattenPlay,
     resetFlatten,
-    // NEW: Dense layer
+    // Dense layer
     denseLayerSize,
     setDenseLayerSize,
     selectedNeuron,
@@ -123,18 +120,16 @@ const Index = () => {
 
   // --- INTERACTIVE FEATURE: Highlight input region on feature map hover ---
   const [highlightInputRegion, setHighlightInputRegion] = useState<null | {row: number, col: number}>(null);
-
-  const navigate = useNavigate();
-
+  
   // --- ACTIVATION HOVER: Highlight corresponding feature map cell ---
   const [activationHighlight, setActivationHighlight] = useState<null | {row: number, col: number}>(null);
-
+  
   // --- ADVANCED CONVOLUTION INTERACTION: Track the dominant contributing pixel ---
   const [convolutionHighlight, setConvolutionHighlight] = useState<null | {
     featureMapRow: number;
     featureMapCol: number;
-    inputWindow: { row: number; col: number }; // top-left of 3x3 window
-    dominantCellPosition: { row: number; col: number }; // exact cell with max contribution
+    inputWindow: { row: number; col: number };
+    dominantCellPosition: { row: number; col: number };
   }>(null);
 
   // --- SELECTED CONVOLUTION STEP: Full step data for clicked feature map cell ---
@@ -142,19 +137,18 @@ const Index = () => {
     row: number;
     col: number;
     inputWindow: number[][];
+    filterWindow: number[][];
     multiplications: number[][];
     sum: number;
   } | null>(null);
 
-  // Handler for when user hovers on a feature map cell - find dominant contributing input pixel
+  // Handler for when user hovers on a feature map cell
   const handleFeatureMapCellHover = (fmRow: number, fmCol: number) => {
     setHighlightInputRegion({ row: fmRow, col: fmCol });
 
-    // Calculate starting position in the input using stride
     const inputRowStart = fmRow * stride;
     const inputColStart = fmCol * stride;
 
-    // Extract 3x3 input window
     const inputWindow: number[][] = [];
     const multiplications: number[][] = [];
     let sum = 0;
@@ -171,12 +165,11 @@ const Index = () => {
         const pixelVal = inputImage[pixelRow]?.[pixelCol] ?? 0;
         const filterVal = filter[i][j];
         const mult = pixelVal * filterVal;
-        
+
         inputRow.push(pixelVal);
         multRow.push(mult);
         sum += mult;
 
-        // Track dominant contribution
         if (Math.abs(mult) > Math.abs(maxContribution)) {
           maxContribution = mult;
           dominantRow = pixelRow;
@@ -187,11 +180,11 @@ const Index = () => {
       multiplications.push(multRow);
     }
 
-    // Set the selected convolution step with full calculation
     setSelectedConvStep({
       row: fmRow,
       col: fmCol,
       inputWindow,
+      filterWindow: filter,
       multiplications,
       sum: Math.round(sum),
     });
@@ -211,16 +204,16 @@ const Index = () => {
     setSelectedConvStep(null);
   };
 
-  // --- ADVANCED POOLING INTERACTION: Track selected pooled cell and its source ---
+  // --- ADVANCED POOLING INTERACTION ---
   const [poolingHighlight, setPoolingHighlight] = useState<null | {
     pooledRow: number;
     pooledCol: number;
-    featureMapWindow: { row: number; col: number }; // top-left of 2x2 window
-    maxCellPosition: { row: number; col: number }; // exact cell with max value
-    minCellPosition?: { row: number; col: number }; // exact cell with min value
+    featureMapWindow: { row: number; col: number };
+    maxCellPosition: { row: number; col: number };
+    minCellPosition?: { row: number; col: number };
   }>(null);
 
-  // --- SELECTED POOLING STEP: Full step data for clicked pooled cell ---
+  // --- SELECTED POOLING STEP ---
   const [selectedPoolStep, setSelectedPoolStep] = useState<{
     row: number;
     col: number;
@@ -234,23 +227,15 @@ const Index = () => {
     minCellPosition?: { i: number; j: number };
   } | null>(null);
 
-  // Handler for when user clicks/hovers on a pooled cell
+  // Handler for pooled cell selection
   const handlePooledCellSelect = (pooledRow: number, pooledCol: number) => {
-    // For global average pooling, don't allow cell selection (there's only one cell)
-    if (poolingType === 'globalAverage') {
-      return;
-    }
+    if (poolingType === 'globalAverage') return;
 
-    // Calculate the corresponding 2x2 window in the feature map (or activated map based on poolingSource)
-    const convRowStart = pooledRow * 2; // stride = 2
+    const convRowStart = pooledRow * 2;
     const convColStart = pooledCol * 2;
 
-    // Use the pooling input map (raw or activated based on poolingSource)
-    const sourceMap = poolingInputMap.length > 0 
-      ? poolingInputMap 
-      : displayFeatureMap;
+    const sourceMap = poolingInputMap.length > 0 ? poolingInputMap : displayFeatureMap;
 
-    // Extract 2x2 window and find max/min
     const window: number[][] = [];
     let maxVal = -Infinity;
     let minVal = Infinity;
@@ -270,7 +255,7 @@ const Index = () => {
         const val = sourceMap[r]?.[c] ?? 0;
         windowRow.push(val);
         sum += val;
-        
+
         if (val > maxVal) {
           maxVal = val;
           maxRow = r;
@@ -288,24 +273,15 @@ const Index = () => {
     }
 
     const avgVal = sum / 4;
-    
-    // Determine result value based on current pooling type
+
     let resultValue: number;
     switch (poolingType) {
-      case 'max':
-        resultValue = maxVal;
-        break;
-      case 'min':
-        resultValue = minVal;
-        break;
-      case 'average':
-        resultValue = avgVal;
-        break;
-      default:
-        resultValue = maxVal;
+      case 'max': resultValue = maxVal; break;
+      case 'min': resultValue = minVal; break;
+      case 'average': resultValue = avgVal; break;
+      default: resultValue = maxVal;
     }
 
-    // Set the selected pooling step with full window data
     setSelectedPoolStep({
       row: pooledRow,
       col: pooledCol,
@@ -323,9 +299,9 @@ const Index = () => {
       pooledRow,
       pooledCol,
       featureMapWindow: { row: convRowStart, col: convColStart },
-      maxCellPosition: poolingType === 'max' ? { row: maxRow, col: maxCol } : 
+      maxCellPosition: poolingType === 'max' ? { row: maxRow, col: maxCol } :
                        poolingType === 'min' ? { row: minRow, col: minCol } :
-                       { row: convRowStart, col: convColStart }, // For average, highlight whole window
+                       { row: convRowStart, col: convColStart },
       minCellPosition: { row: minRow, col: minCol },
     });
   };
@@ -337,118 +313,41 @@ const Index = () => {
   };
 
   const currentClassName = dataset === 'mnist' ? mnistClassLabels[selectedClass] : fashionMnistClassLabels[selectedClass];
-
-  // Initialize empty maps for display
-  const displayFeatureMap = featureMap.length > 0 
-    ? featureMap 
-    : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null));
   
-  const displayPooledMap = pooledMap.length > 0 
-    ? pooledMap 
-    : Array(poolOutputSize).fill(null).map(() => Array(poolOutputSize).fill(null));
-
-  // Display pooling input map (either raw or activated based on poolingSource)
-  const displayPoolingInputMap = poolingInputMap.length > 0 
-    ? poolingInputMap 
+  // Initialize empty maps for display
+  const displayFeatureMap = featureMap.length > 0
+    ? featureMap
     : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null));
+
+  const displayPooledMap = pooledMap.length > 0
+    ? pooledMap
+    : Array(poolOutputSize).fill(null).map(() => Array(poolOutputSize).fill(null));
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      
+      {/* Simple Header with Back Link */}
+      <header className="header-strong border-b">
+        <div className="max-w-6xl mx-auto px-3 py-3 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm">Back to Home</span>
+          </Link>
+          <h1 className="text-lg font-semibold text-foreground">Single Page CNN View</h1>
+          <div className="w-24" /> {/* Spacer for centering */}
+        </div>
+      </header>
+
       <main className="max-w-6xl mx-auto px-3 py-3 space-y-3">
-        {/* Centered Hero */}
-        <div className="section-frame module hero w-full max-w-2xl mx-auto">
-          <h1 className="hero-title">CNN Feature Extraction Visualizer</h1>
-          <p className="hero-lead">Technical, step-by-step visualization of convolution, activation, pooling, flattening and dense layers — intended for teaching and lab use.</p>
-          <div className="mt-4 flex justify-center gap-3">
-            <button
-              className="hero-cta btn btn-secondary hero-cta--secondary text-sm"
-              onClick={() => navigate('/architecture')}
-              aria-label="View full pipeline"
-            >
-              View Full Pipeline
-            </button>
-            <button
-              className="hero-cta btn btn-primary hero-cta--primary text-sm"
-              onClick={() => {
-                const el = document.getElementById('control-panel');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }}
-              aria-label="Start step by step"
-            >
-              Start Step-by-Step
-            </button>
-          </div>
-        </div>
-
-        {/* Feature / Module Preview */}
-        <div className="section-frame module">
-          <h3 className="text-lg font-semibold mb-2">Pipeline Modules</h3>
-          <div className="module-grid">
-            <div className="module-card">
-              <div className="icon" aria-hidden>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
-              </div>
-              <div>
-                <p className="title">Convolution</p>
-                <p className="desc">Apply learned filters to extract local patterns.</p>
-              </div>
-            </div>
-
-            <div className="module-card">
-              <div className="icon" aria-hidden>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/></svg>
-              </div>
-              <div>
-                <p className="title">Activation</p>
-                <p className="desc">Introduce non-linearity to feature responses.</p>
-              </div>
-            </div>
-
-            <div className="module-card">
-              <div className="icon" aria-hidden>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
-              </div>
-              <div>
-                <p className="title">Pooling</p>
-                <p className="desc">Reduce spatial size and retain salient features.</p>
-              </div>
-            </div>
-
-            <div className="module-card">
-              <div className="icon" aria-hidden>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h18v4H3zM3 11h18v4H3zM3 19h18v2H3z"/></svg>
-              </div>
-              <div>
-                <p className="title">Flatten</p>
-                <p className="desc">Convert spatial maps into a 1D feature vector.</p>
-              </div>
-            </div>
-
-            <div className="module-card">
-              <div className="icon" aria-hidden>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/></svg>
-              </div>
-              <div>
-                <p className="title">Dense</p>
-                <p className="desc">Fully-connected computations for classification.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Current Selection Info */}
         <div className="section-frame module text-center bg-card">
           <p className="text-sm text-muted-foreground">
-            Currently visualizing: <span className="font-semibold text-foreground">{dataset === 'mnist' ? 'MNIST' : 'Fashion-MNIST'}</span> → 
+            Currently visualizing: <span className="font-semibold text-foreground">{dataset === 'mnist' ? 'MNIST' : 'Fashion-MNIST'}</span> →
             <span className="font-semibold accent-text ml-1">{selectedClass} - {currentClassName}</span>
           </p>
         </div>
 
         {/* Control Panel */}
-        <div id="control-panel">
-          <ControlPanel
+        <ControlPanel
           dataset={dataset}
           setDataset={setDataset}
           selectedClass={selectedClass}
@@ -464,8 +363,7 @@ const Index = () => {
           onPaddingChange={setPadding}
           stride={stride}
           onStrideChange={setStride}
-          />
-        </div>
+        />
 
         {/* Convolution Operation */}
         <ConvolutionVisualization
@@ -477,7 +375,7 @@ const Index = () => {
           isInteractive={!!selectedConvStep}
         />
 
-        {/* Main Visualization Grid */}
+        {/* Main Visualization Grid - Input Image + Feature Map */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Input Image */}
           <InputImageGrid
@@ -503,11 +401,11 @@ const Index = () => {
           />
         </div>
 
-        {/* Activation Function - Between Feature Map and Pooling */}
+        {/* Activation Function */}
         <ActivationVisualization
           featureMap={displayFeatureMap}
-          activatedMap={displayedActivationMap.length > 0 
-            ? displayedActivationMap 
+          activatedMap={displayedActivationMap.length > 0
+            ? displayedActivationMap
             : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
           size={convOutputSize}
           activationType={activationType}
@@ -527,7 +425,6 @@ const Index = () => {
           onStartActivation={startActivation}
           onActivatedCellHover={(row, col) => {
             setActivationHighlight({ row, col });
-            // Also highlight the corresponding input region
             handleFeatureMapCellHover(row, col);
           }}
           onActivatedCellLeave={() => {
@@ -564,8 +461,8 @@ const Index = () => {
         {/* Flatten Layer */}
         <FlattenVisualization
           featureMap={displayFeatureMap}
-          activatedMap={displayedActivationMap.length > 0 
-            ? displayedActivationMap 
+          activatedMap={displayedActivationMap.length > 0
+            ? displayedActivationMap
             : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
           pooledMap={displayPooledMap}
           flattenedVector={flattenedVector}
@@ -618,7 +515,7 @@ const Index = () => {
 
         {/* Explanation Panel */}
         <ExplanationPanel
-          phase={phase}
+          phase={phase === 'convolution' || phase === 'pooling' ? phase : 'convolution'}
           convStep={convStep}
           poolStep={poolStep}
           isComplete={isComplete}
@@ -662,4 +559,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default SinglePageView;

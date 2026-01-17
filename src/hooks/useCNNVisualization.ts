@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { mnistSamples, fashionMnistSamples, filters, FilterType, DatasetType } from '@/data/datasets';
+import { getCNNState, updateCNNState, resetCNNState, resetComputedOutputs, subscribeToCNNState, CNNPipelineState } from '@/lib/cnnStateStore';
 
 // Pooling type options
 export type PoolingType = 'max' | 'min' | 'average' | 'globalAverage';
@@ -15,6 +16,9 @@ export type FlattenSourceType = 'raw' | 'activated' | 'pooled';
 
 // Dense layer activation types
 export type DenseActivationType = 'none' | 'relu' | 'softmax';
+
+// Stage status type for display
+export type StageStatus = 'waiting' | 'running' | 'completed';
 
 export interface ConvolutionStep {
   inputWindow: number[][];
@@ -41,59 +45,192 @@ export interface PoolingStep {
 }
 
 export function useCNNVisualization() {
-  const [dataset, setDataset] = useState<DatasetType>('mnist');
-  const [selectedClass, setSelectedClass] = useState<number>(7);
-  const [filterType, setFilterType] = useState<FilterType>('topEdge');
-  const [convStep, setConvStep] = useState(0);
-  const [poolStep, setPoolStep] = useState(0);
-  const [activationStep, setActivationStep] = useState(0); // NEW: Activation step counter
+  // ============================================
+  // Initialize state from global store
+  // ============================================
+  const initialState = getCNNState();
+  
+  const [dataset, setDatasetLocal] = useState<DatasetType>(initialState.dataset);
+  const [selectedClass, setSelectedClassLocal] = useState<number>(initialState.selectedClass);
+  const [filterType, setFilterTypeLocal] = useState<FilterType>(initialState.filterType);
+  const [convStep, setConvStep] = useState(initialState.convStep);
+  const [poolStep, setPoolStep] = useState(initialState.poolStep);
+  const [activationStep, setActivationStep] = useState(initialState.activationStep);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [phase, setPhase] = useState<'convolution' | 'activation' | 'pooling' | 'flatten' | 'dense'>('convolution');
-  const [featureMap, setFeatureMap] = useState<number[][]>([]);
-  const [pooledMap, setPooledMap] = useState<number[][]>([]);
-  const [currentConvStep, setCurrentConvStep] = useState<ConvolutionStep | null>(null);
-  const [currentPoolStep, setCurrentPoolStep] = useState<PoolingStep | null>(null);
+  const [phase, setPhase] = useState<'convolution' | 'activation' | 'pooling' | 'flatten' | 'dense'>(initialState.phase);
+  const [featureMap, setFeatureMap] = useState<number[][]>(initialState.featureMap);
+  const [pooledMap, setPooledMap] = useState<number[][]>(initialState.pooledMap);
+  const [currentConvStep, setCurrentConvStep] = useState<ConvolutionStep | null>(initialState.currentConvStep);
+  const [currentPoolStep, setCurrentPoolStep] = useState<PoolingStep | null>(initialState.currentPoolStep);
   
-  // NEW: Padding and Stride state
-  const [padding, setPadding] = useState<number>(0); // 0, 1, or 2
-  const [stride, setStride] = useState<number>(1);   // 1 or 2
+  // Padding and Stride state
+  const [padding, setPaddingLocal] = useState<number>(initialState.padding);
+  const [stride, setStrideLocal] = useState<number>(initialState.stride);
   
-  // NEW: Pooling type state
-  const [poolingType, setPoolingType] = useState<PoolingType>('max');
+  // Pooling type state
+  const [poolingType, setPoolingTypeLocal] = useState<PoolingType>(initialState.poolingType);
   
-  // NEW: Activation function state
-  const [activationType, setActivationType] = useState<ActivationType>('relu');
+  // Activation function state
+  const [activationType, setActivationTypeLocal] = useState<ActivationType>(initialState.activationType);
   
-  // NEW: Activation-specific playing state
+  // Activation-specific playing state
   const [isActivationPlaying, setIsActivationPlaying] = useState(false);
   const activationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // NEW: Pooling source state (raw feature map or activated feature map)
-  const [poolingSource, setPoolingSource] = useState<PoolingSourceType>('activated');
+  // Pooling source state (raw feature map or activated feature map)
+  const [poolingSource, setPoolingSourceLocal] = useState<PoolingSourceType>(initialState.poolingSource);
   
-  // NEW: Flatten layer state
-  const [flattenSource, setFlattenSource] = useState<FlattenSourceType>('pooled');
-  const [flattenedVector, setFlattenedVector] = useState<number[]>([]);
-  const [flattenStep, setFlattenStep] = useState(0); // Tracks current row being flattened
+  // Flatten layer state
+  const [flattenSource, setFlattenSourceLocal] = useState<FlattenSourceType>(initialState.flattenSource);
+  const [flattenedVector, setFlattenedVector] = useState<number[]>(initialState.flattenedVector);
+  const [flattenStep, setFlattenStep] = useState(initialState.flattenStep);
   const [isFlattenPlaying, setIsFlattenPlaying] = useState(false);
   const flattenIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // NEW: Dense layer state
-  const [denseLayerSize, setDenseLayerSize] = useState<number>(10);
-  const [selectedNeuron, setSelectedNeuron] = useState<number>(0);
-  const [denseWeights, setDenseWeights] = useState<number[][]>([]);
-  const [denseBiases, setDenseBiases] = useState<number[]>([]);
-  const [denseStep, setDenseStep] = useState(0); // Tracks current input being processed
-  const [denseRunningSum, setDenseRunningSum] = useState(0);
+  // Dense layer state
+  const [denseLayerSize, setDenseLayerSizeLocal] = useState<number>(initialState.denseLayerSize);
+  const [selectedNeuron, setSelectedNeuronLocal] = useState<number>(initialState.selectedNeuron);
+  const [denseWeights, setDenseWeights] = useState<number[][]>(initialState.denseWeights);
+  const [denseBiases, setDenseBiases] = useState<number[]>(initialState.denseBiases);
+  const [denseStep, setDenseStep] = useState(initialState.denseStep);
+  const [denseRunningSum, setDenseRunningSum] = useState(initialState.denseRunningSum);
   const [denseCurrentMultiplication, setDenseCurrentMultiplication] = useState<number | null>(null);
-  const [denseNeuronOutputs, setDenseNeuronOutputs] = useState<(number | null)[]>([]);
-  const [denseActivatedOutputs, setDenseActivatedOutputs] = useState<(number | null)[]>([]);
+  const [denseNeuronOutputs, setDenseNeuronOutputs] = useState<(number | null)[]>(initialState.denseNeuronOutputs);
+  const [denseActivatedOutputs, setDenseActivatedOutputs] = useState<(number | null)[]>(initialState.denseActivatedOutputs);
   const [isDensePlaying, setIsDensePlaying] = useState(false);
-  const [denseActivationType, setDenseActivationType] = useState<DenseActivationType>('none');
-  const [showTopK, setShowTopK] = useState(false);
+  const [denseActivationType, setDenseActivationTypeLocal] = useState<DenseActivationType>(initialState.denseActivationType);
+  const [showTopK, setShowTopKLocal] = useState(initialState.showTopK);
   const denseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Subscribe to global store updates so external resets (e.g., Home page) sync local state
+  useEffect(() => {
+    const unsubscribe = subscribeToCNNState((s: CNNPipelineState) => {
+      setDatasetLocal(s.dataset);
+      setSelectedClassLocal(s.selectedClass);
+      setFilterTypeLocal(s.filterType);
+      setConvStep(s.convStep);
+      setPoolStep(s.poolStep);
+      setActivationStep(s.activationStep);
+      setPhase(s.phase);
+      setFeatureMap(s.featureMap);
+      setPooledMap(s.pooledMap);
+      setCurrentConvStep(s.currentConvStep);
+      setCurrentPoolStep(s.currentPoolStep);
+      setPaddingLocal(s.padding);
+      setStrideLocal(s.stride);
+      setPoolingTypeLocal(s.poolingType);
+      setActivationTypeLocal(s.activationType);
+      setPoolingSourceLocal(s.poolingSource);
+      setFlattenSourceLocal(s.flattenSource);
+      setFlattenedVector(s.flattenedVector);
+      setFlattenStep(s.flattenStep);
+      setDenseLayerSizeLocal(s.denseLayerSize);
+      setSelectedNeuronLocal(s.selectedNeuron);
+      setDenseWeights(s.denseWeights);
+      setDenseBiases(s.denseBiases);
+      setDenseStep(s.denseStep);
+      setDenseRunningSum(s.denseRunningSum);
+      setDenseNeuronOutputs(s.denseNeuronOutputs);
+      setDenseActivatedOutputs(s.denseActivatedOutputs);
+      setDenseActivationTypeLocal(s.denseActivationType);
+      setShowTopKLocal(s.showTopK);
+    });
+    return unsubscribe;
+  }, []);
+  
+  // ============================================
+  // Wrapped setters that sync to global store
+  // Only reset computed outputs if the value ACTUALLY changed
+  // ============================================
+
+  
+  const setDataset = useCallback((value: DatasetType) => {
+    if (value === dataset) return; // No change, skip
+    setDatasetLocal(value);
+    updateCNNState({ dataset: value });
+    resetComputedOutputs();
+  }, [dataset]);
+  
+  const setSelectedClass = useCallback((value: number) => {
+    if (value === selectedClass) return; // No change, skip
+    setSelectedClassLocal(value);
+    updateCNNState({ selectedClass: value });
+    resetComputedOutputs();
+  }, [selectedClass]);
+  
+  const setFilterType = useCallback((value: FilterType) => {
+    if (value === filterType) return; // No change, skip
+    setFilterTypeLocal(value);
+    updateCNNState({ filterType: value });
+    resetComputedOutputs();
+  }, [filterType]);
+  
+  const setPadding = useCallback((value: number) => {
+    if (value === padding) return; // No change, skip
+    setPaddingLocal(value);
+    updateCNNState({ padding: value });
+    resetComputedOutputs();
+  }, [padding]);
+  
+  const setStride = useCallback((value: number) => {
+    if (value === stride) return; // No change, skip
+    setStrideLocal(value);
+    updateCNNState({ stride: value });
+    resetComputedOutputs();
+  }, [stride]);
+  
+  const setActivationType = useCallback((value: ActivationType) => {
+    setActivationTypeLocal(value);
+    updateCNNState({ activationType: value });
+  }, []);
+  
+  const setPoolingType = useCallback((value: PoolingType) => {
+    setPoolingTypeLocal(value);
+    updateCNNState({ poolingType: value });
+  }, []);
+  
+  const setPoolingSource = useCallback((value: PoolingSourceType) => {
+    setPoolingSourceLocal(value);
+    updateCNNState({ poolingSource: value });
+  }, []);
+  
+  const setFlattenSource = useCallback((value: FlattenSourceType) => {
+    setFlattenSourceLocal(value);
+    updateCNNState({ flattenSource: value });
+  }, []);
+  
+  const setDenseLayerSize = useCallback((value: number) => {
+    setDenseLayerSizeLocal(value);
+    updateCNNState({ denseLayerSize: value });
+  }, []);
+  
+  const setSelectedNeuron = useCallback((value: number) => {
+    setSelectedNeuronLocal(value);
+    updateCNNState({ selectedNeuron: value });
+  }, []);
+  
+  const setDenseActivationType = useCallback((value: DenseActivationType) => {
+    setDenseActivationTypeLocal(value);
+    updateCNNState({ denseActivationType: value });
+  }, []);
+  
+  const setShowTopK = useCallback((value: boolean) => {
+    setShowTopKLocal(value);
+    updateCNNState({ showTopK: value });
+  }, []);
+  
+  // Track if this is the initial mount (for sync effects)
+  const syncInitialMount = useRef(true);
+  
+  // Track previous values to detect actual changes (not just re-renders)
+  const prevActivationType = useRef(activationType);
+  const prevPoolingType = useRef(poolingType);
+  const prevFlattenSource = useRef(flattenSource);
+  const prevDenseLayerSize = useRef(denseLayerSize);
+  const prevSelectedNeuron = useRef(selectedNeuron);
+  const isFirstMount = useRef(true);
   
   // Get input image based on selected class and dataset
   const originalInputImage = dataset === 'mnist' ? mnistSamples[selectedClass] : fashionMnistSamples[selectedClass];
@@ -216,7 +353,81 @@ export function useCNNVisualization() {
   const totalActivationSteps = convOutputSize * convOutputSize;
 
   // Step-by-step activated feature map (shows progress of activation)
-  const [displayedActivationMap, setDisplayedActivationMap] = useState<(number | null)[][]>([]);
+  // Initialize from global state
+  const [displayedActivationMap, setDisplayedActivationMap] = useState<(number | null)[][]>(
+    getCNNState().displayedActivationMap || []
+  );
+  
+  // ============================================
+  // Sync computed outputs to global store
+  // ============================================
+  useEffect(() => {
+    if (syncInitialMount.current) {
+      return;
+    }
+    updateCNNState({
+      featureMap,
+      convStep,
+      currentConvStep,
+    });
+  }, [featureMap, convStep, currentConvStep]);
+  
+  useEffect(() => {
+    if (syncInitialMount.current) {
+      return;
+    }
+    updateCNNState({
+      displayedActivationMap,
+      activationStep,
+    });
+  }, [displayedActivationMap, activationStep]);
+  
+  useEffect(() => {
+    if (syncInitialMount.current) {
+      return;
+    }
+    updateCNNState({
+      pooledMap,
+      poolStep,
+      currentPoolStep,
+    });
+  }, [pooledMap, poolStep, currentPoolStep]);
+  
+  useEffect(() => {
+    if (syncInitialMount.current) {
+      return;
+    }
+    updateCNNState({
+      flattenedVector,
+      flattenStep,
+    });
+  }, [flattenedVector, flattenStep]);
+  
+  useEffect(() => {
+    if (syncInitialMount.current) {
+      return;
+    }
+    updateCNNState({
+      denseWeights,
+      denseBiases,
+      denseNeuronOutputs,
+      denseActivatedOutputs,
+      denseStep,
+      denseRunningSum,
+    });
+  }, [denseWeights, denseBiases, denseNeuronOutputs, denseActivatedOutputs, denseStep, denseRunningSum]);
+  
+  useEffect(() => {
+    if (syncInitialMount.current) {
+      return;
+    }
+    updateCNNState({ phase });
+  }, [phase]);
+  
+  // Mark sync initial mount as complete after first render
+  useEffect(() => {
+    syncInitialMount.current = false;
+  }, []);
 
   // Get the feature map to use for pooling based on poolingSource
   const poolingInputMap = useMemo(() => {
@@ -380,8 +591,12 @@ export function useCNNVisualization() {
     return count > 0 ? sum / count : 0;
   }, []);
 
-  // Initialize/reset
+  // Initialize/reset - also resets global state store
   const reset = useCallback(() => {
+    // Reset global state store
+    resetCNNState();
+    
+    // Reset local state
     setConvStep(0);
     setPoolStep(0);
     setActivationStep(0);
@@ -422,11 +637,9 @@ export function useCNNVisualization() {
     }
   }, []);
 
-  // Reset when class, filter, padding, or stride changes
-  useEffect(() => {
-    reset();
-  }, [selectedClass, filterType, dataset, padding, stride, reset]);
-
+  // NOTE: No automatic reset on config changes - we use wrapped setters that
+  // handle resetComputedOutputs() directly when config changes
+  
   // NEW: Pooling-specific playing state
   const [isPoolingPlaying, setIsPoolingPlaying] = useState(false);
   const poolingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -458,10 +671,27 @@ export function useCNNVisualization() {
     }
   }, []);
 
-  // Reset activation when activation type changes
+  // Reset activation when activation type ACTUALLY changes (not on mount)
   useEffect(() => {
-    // Only reset if we're past convolution phase
-    resetActivation();
+    // Skip on first mount - we want to preserve state loaded from global store
+    if (isFirstMount.current) {
+      return;
+    }
+    // Only reset if the value actually changed
+    if (prevActivationType.current !== activationType) {
+      prevActivationType.current = activationType;
+      resetActivation();
+      // Also sync to global store
+      updateCNNState({
+        activationStep: 0,
+        displayedActivationMap: [],
+        poolStep: 0,
+        pooledMap: [],
+        flattenStep: 0,
+        flattenedVector: [],
+        currentPoolStep: null,
+      });
+    }
   }, [activationType, resetActivation]);
 
   // Reset pooling when pooling type changes (but keep convolution results)
@@ -489,9 +719,25 @@ export function useCNNVisualization() {
     }
   }, []);
 
-  // Reset pooling when pooling type changes
+  // Reset pooling when pooling type ACTUALLY changes (not on mount)
   useEffect(() => {
-    resetPooling();
+    // Skip on first mount - we want to preserve state loaded from global store
+    if (isFirstMount.current) {
+      return;
+    }
+    // Only reset if the value actually changed
+    if (prevPoolingType.current !== poolingType) {
+      prevPoolingType.current = poolingType;
+      resetPooling();
+      // Also sync to global store
+      updateCNNState({
+        poolStep: 0,
+        pooledMap: [],
+        flattenStep: 0,
+        flattenedVector: [],
+        currentPoolStep: null,
+      });
+    }
   }, [poolingType, resetPooling]);
 
   // Reset flatten (keeps all previous layer results)
@@ -505,10 +751,32 @@ export function useCNNVisualization() {
     }
   }, []);
 
-  // Reset flatten when flatten source changes
+  // Reset flatten when flatten source ACTUALLY changes (not on mount)
   useEffect(() => {
-    resetFlatten();
+    // Skip on first mount - we want to preserve state loaded from global store
+    if (isFirstMount.current) {
+      return;
+    }
+    // Only reset if the value actually changed
+    if (prevFlattenSource.current !== flattenSource) {
+      prevFlattenSource.current = flattenSource;
+      resetFlatten();
+      // Also sync to global store
+      updateCNNState({
+        flattenStep: 0,
+        flattenedVector: [],
+      });
+    }
   }, [flattenSource, resetFlatten]);
+
+  // Mark first mount as complete after initial render
+  useEffect(() => {
+    // Use a small timeout to ensure all effects have run once
+    const timer = setTimeout(() => {
+      isFirstMount.current = false;
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Step forward
   const step = useCallback(() => {
@@ -1014,23 +1282,46 @@ export function useCNNVisualization() {
     }
   }, []);
 
-  // Reset dense when layer size changes
+  // Reset dense when layer size ACTUALLY changes (not on mount)
   useEffect(() => {
-    if (flattenedVector.length > 0) {
-      initializeDenseWeights(flattenedVector.length, denseLayerSize);
+    // Skip on first mount - we want to preserve state loaded from global store
+    if (isFirstMount.current) {
+      return;
     }
-    resetDense();
+    // Only reset if the value actually changed
+    if (prevDenseLayerSize.current !== denseLayerSize) {
+      prevDenseLayerSize.current = denseLayerSize;
+      if (flattenedVector.length > 0) {
+        initializeDenseWeights(flattenedVector.length, denseLayerSize);
+      }
+      resetDense();
+      // Sync to global store
+      updateCNNState({
+        denseStep: 0,
+        denseRunningSum: 0,
+        denseNeuronOutputs: [],
+        denseActivatedOutputs: [],
+      });
+    }
   }, [denseLayerSize, flattenedVector.length, initializeDenseWeights, resetDense]);
 
-  // Reset dense when changing selected neuron (reset step but keep weights)
+  // Reset dense when changing selected neuron ACTUALLY changes (not on mount)
   useEffect(() => {
-    setDenseStep(0);
-    setDenseRunningSum(0);
-    setDenseCurrentMultiplication(null);
-    setIsDensePlaying(false);
-    if (denseIntervalRef.current) {
-      clearInterval(denseIntervalRef.current);
-      denseIntervalRef.current = null;
+    // Skip on first mount - we want to preserve state loaded from global store
+    if (isFirstMount.current) {
+      return;
+    }
+    // Only reset if the value actually changed
+    if (prevSelectedNeuron.current !== selectedNeuron) {
+      prevSelectedNeuron.current = selectedNeuron;
+      setDenseStep(0);
+      setDenseRunningSum(0);
+      setDenseCurrentMultiplication(null);
+      setIsDensePlaying(false);
+      if (denseIntervalRef.current) {
+        clearInterval(denseIntervalRef.current);
+        denseIntervalRef.current = null;
+      }
     }
   }, [selectedNeuron]);
 
@@ -1175,7 +1466,7 @@ export function useCNNVisualization() {
   const isDenseComplete = denseNeuronOutputs.every(v => v !== null);
 
   // Dense status indicator
-  const denseStatus = useMemo(() => {
+  const denseStatus: StageStatus = useMemo(() => {
     if (flattenStep < totalFlattenSteps) return 'waiting';
     if (denseStep === 0 && phase !== 'dense') return 'waiting';
     if (isDenseComplete) return 'completed';
@@ -1185,13 +1476,13 @@ export function useCNNVisualization() {
   }, [flattenStep, totalFlattenSteps, denseStep, phase, isDensePlaying, isDenseComplete]);
 
   // Status indicators for each stage
-  const convolutionStatus = useMemo(() => {
+  const convolutionStatus: StageStatus = useMemo(() => {
     if (convStep === 0) return 'waiting';
     if (convStep < totalConvSteps) return 'running';
     return 'completed';
   }, [convStep, totalConvSteps]);
 
-  const activationStatus = useMemo(() => {
+  const activationStatus: StageStatus = useMemo(() => {
     if (phase === 'convolution') return 'waiting';
     if (activationStep === 0 && phase !== 'activation') return 'waiting';
     if (activationStep < totalActivationSteps && (phase === 'activation' || isActivationPlaying)) return 'running';
@@ -1200,7 +1491,7 @@ export function useCNNVisualization() {
     return 'waiting';
   }, [phase, activationStep, totalActivationSteps, isActivationPlaying]);
 
-  const poolingStatus = useMemo(() => {
+  const poolingStatus: StageStatus = useMemo(() => {
     if (convStep < totalConvSteps) return 'waiting';
     if (poolStep === 0) return 'waiting';
     if (poolStep < totalPoolSteps && (phase === 'pooling' || isPoolingPlaying)) return 'running';
@@ -1211,7 +1502,7 @@ export function useCNNVisualization() {
   }, [convStep, totalConvSteps, poolStep, totalPoolSteps, phase, isPoolingPlaying, poolingType]);
 
   // Flatten status indicator
-  const flattenStatus = useMemo(() => {
+  const flattenStatus: StageStatus = useMemo(() => {
     if (convStep < totalConvSteps) return 'waiting';
     if (flattenStep === 0 && phase !== 'flatten') return 'waiting';
     if (flattenStep < totalFlattenSteps && (phase === 'flatten' || isFlattenPlaying)) return 'running';

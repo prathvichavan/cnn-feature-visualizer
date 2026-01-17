@@ -102,7 +102,7 @@ export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, 
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border shadow-sm p-2">
+    <div className="section-frame module bg-card">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-foreground">Feature Map ({size}×{size})</h3>
         <span className="text-xs text-muted-foreground">
@@ -116,7 +116,7 @@ export function FeatureMapDisplay({ featureMap, size, onCellHover, onCellLeave, 
       
       <div className="flex justify-center mb-2 overflow-auto">
         <div 
-          className="inline-grid bg-border"
+          className="inline-grid data-area"
           style={{ 
             gridTemplateColumns: `repeat(${size}, 18px)`,
             gap: '1px',

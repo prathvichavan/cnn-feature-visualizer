@@ -4,11 +4,12 @@
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
+Educational CNN Visualizer Theme - Colorful and Student-Friendly
 */
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
+    --background: 220 20% 98%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -17,33 +18,42 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 50%;
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
+    --secondary: 220 14% 96%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 199 89% 48%;
+    --accent: 262 83% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 50%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
-    /* Custom CNN Visualization Colors */
+    /* Educational CNN Visualization Colors */
     --positive: 0 84% 60%;
     --negative: 217 91% 50%;
     --highlight: 48 96% 53%;
-    --grid-border: 214 32% 80%;
+    --grid-border: 220 13% 85%;
     --pixel-bg: 220 13% 18%;
+    
+    /* Feature extraction stage colors */
+    --stage-input: 217 91% 60%;
+    --stage-conv: 24 95% 53%;
+    --stage-activation: 45 93% 47%;
+    --stage-pooling: 142 71% 45%;
+    --stage-flatten: 187 92% 45%;
+    --stage-dense: 262 83% 58%;
+    --stage-output: 330 81% 60%;
     
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -52,20 +62,20 @@ All colors MUST be HSL.
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
-    --background: 222 47% 11%;
+    --background: 222 47% 8%;
     --foreground: 210 40% 98%;
 
-    --card: 222 47% 15%;
+    --card: 222 47% 12%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222 47% 15%;
+    --popover: 222 47% 12%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%;
+    --primary: 262 83% 65%;
     --primary-foreground: 222 47% 11%;
 
     --secondary: 217 33% 17%;
@@ -74,15 +84,15 @@ All colors MUST be HSL.
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 199 89% 48%;
+    --accent: 262 83% 65%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 212 27% 84%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 262 83% 65%;
     
     --positive: 0 84% 55%;
     --negative: 217 91% 60%;
@@ -92,12 +102,12 @@ All colors MUST be HSL.
     
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 262 83% 58%;
   }
 }
 
@@ -107,6 +117,314 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+  /* Technical framing and module styles */
+  .section-frame {
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: transparent;
+    padding-left: 0.75rem; /* visually offset content from frame */
+    margin-left: -0.5rem; /* pull frame slightly left for emphasis */
+  }
+
+  .section-frame--accent {
+    border-left-color: hsl(var(--accent));
+  }
+
+  .module {
+    background: hsl(var(--card));
+    border-radius: calc(var(--radius) - 0.125rem);
+    border: 1px solid hsl(var(--border));
+    padding: 0.5rem;
+    transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+    will-change: box-shadow, transform;
+  }
+
+  .module--active {
+    box-shadow: 0 8px 28px -12px rgba(2,6,23,0.45), 0 2px 6px rgba(2,6,23,0.06);
+    transform: translateY(-4px);
+    border-color: hsl(var(--accent));
+  }
+
+  /* Data-heavy visual areas (feature maps, grids) should read as denser and slightly elevated */
+  .data-area {
+    background: hsl(var(--secondary));
+    border: 1px solid hsl(var(--grid-border));
+    border-radius: 6px;
+    padding: 0.5rem;
+    box-shadow: 0 6px 20px -14px rgba(2,6,23,0.12);
+  }
+
+  /* Accent utilities: used only for active/selected states */
+  .accent-text { color: hsl(var(--accent)); }
+  .accent-border { border-color: hsl(var(--accent)); }
+  .accent-ring { box-shadow: 0 0 0 3px hsl(var(--accent) / 0.12); }
+
+  /* Stronger, flat header contrast */
+  .header-strong { background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border)); }
+
+  /* Logo sharpness and sizing helpers */
+  .logo-sharp {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+    -ms-interpolation-mode: nearest-neighbor;
+    background: transparent !important;
+    display: block;
+    line-height: 0;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+
+  /* Locked even pixel logo height to avoid fractional scaling */
+  .logo-locked-48 {
+    height: 48px !important;
+    max-height: 48px !important;
+    width: auto !important;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+
+  /* Navbar stability: prevent any transforms/scales within the navbar and parents */
+  .nav-stable {
+    transform: none !important;
+    backface-visibility: hidden !important;
+    -webkit-transform: none !important;
+  }
+
+  .nav-stable *,
+  .nav-stable ::before,
+  .nav-stable ::after {
+    transform: none !important;
+    transition-property: none !important;
+    will-change: auto !important;
+  }
+
+  /* Ensure navbar content centers vertically and uses even height */
+  .nav-height-even {
+    height: 64px; /* compact navbar height */
+    min-height: 64px;
+    line-height: 64px;
+    display: flex;
+    align-items: center;
+    background: hsl(var(--card));
+  }
+
+  /* Locked even pixel logo heights */
+  .logo-locked-34 {
+    height: 34px !important;
+    max-height: 34px !important;
+    width: auto !important;
+    display: block;
+  }
+
+  /* Force Navbar doc layout overrides to prevent center alignment from global wrappers */
+  .doc-navbar { text-align: left !important; }
+  .doc-navbar .nav-inner { display:flex !important; justify-content: space-between !important; align-items:center !important; width:100%; }
+  .doc-navbar .nav-left { display:flex !important; align-items:center !important; gap:0.5rem !important; }
+  .doc-navbar .nav-right { display:flex !important; align-items:center !important; gap:1rem !important; margin-left:auto !important; }
+  .doc-navbar .nav-right .hidden { display:flex !important; }
+
+  /* Logo tone adjustments to reduce strong blue and improve contrast */
+  .logo-tone-neutral {
+    filter: saturate(0.6) contrast(1.06) brightness(0.98);
+  }
+
+  .logo-grayscale {
+    filter: grayscale(1) contrast(1.05) brightness(1);
+  }
+
+  /* Optional subtle frame behind logo to improve legibility on any background */
+  .logo-frame {
+    display: inline-block;
+    padding: 2px;
+    border-radius: 6px;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+  }
+
+  /* Centered hero section for homepage */
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2.25rem 1.25rem;
+    gap: 0.75rem;
+    background: linear-gradient(180deg, hsl(var(--secondary) / 0.6), hsl(var(--card) / 0.95));
+    border-radius: 8px;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .hero-title {
+    font-size: 2.25rem;
+    line-height: 1.1;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin: 0;
+  }
+
+  .hero-lead {
+    max-width: 56rem;
+    color: hsl(var(--muted-foreground));
+    margin: 0.25rem 0 0;
+    font-size: 1rem;
+  }
+
+  .hero-cta {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    box-shadow: 0 6px 18px -12px rgba(2,6,23,0.12);
+    border: 1px solid hsl(var(--border));
+  }
+
+.hero-cta--primary {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.hero-cta--secondary {
+  background: transparent;
+  color: hsl(var(--foreground));
+}
+
+/* Button utilities */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; }
+.btn-primary { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); border: 1px solid hsl(var(--accent)); }
+.btn-secondary { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
+.btn:focus { outline: none; box-shadow: 0 0 0 4px hsl(var(--accent) / 0.08); }
+
+/* Module preview grid */
+.module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+.module-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.module-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px -16px rgba(2,6,23,0.08); }
+.module-card .icon { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 6px; display:flex; align-items:center; justify-content:center; background: hsl(var(--secondary)); border:1px solid hsl(var(--border)); }
+.module-card .title { font-weight: 600; color: hsl(var(--foreground)); margin:0; }
+.module-card .desc { margin:0; color: hsl(var(--muted-foreground)); font-size: 0.95rem; }
+
+/* Educational highlight colors */
+.highlight-blue { @apply bg-blue-100 border-blue-300 text-blue-800; }
+.highlight-orange { @apply bg-orange-100 border-orange-300 text-orange-800; }
+.highlight-green { @apply bg-green-100 border-green-300 text-green-800; }
+.highlight-red { @apply bg-red-100 border-red-300 text-red-800; }
+.highlight-purple { @apply bg-purple-100 border-purple-300 text-purple-800; }
+.highlight-cyan { @apply bg-cyan-100 border-cyan-300 text-cyan-800; }
+.highlight-yellow { @apply bg-yellow-100 border-yellow-300 text-yellow-800; }
+.highlight-pink { @apply bg-pink-100 border-pink-300 text-pink-800; }
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--secondary));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.15);
+}
+
+/* Grid cell animations for visualizations */
+.grid-cell {
+  transition: all 0.15s ease;
+}
+
+.grid-cell:hover {
+  transform: scale(1.1);
+  z-index: 10;
+}
+
+/* Status badges */
+.status-waiting { @apply bg-gray-100 text-gray-600 border-gray-300; }
+.status-running { @apply bg-blue-100 text-blue-600 border-blue-300 animate-pulse; }
+.status-completed { @apply bg-green-100 text-green-600 border-green-300; }
+
+/* Responsive typography */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 }

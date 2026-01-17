@@ -47,7 +47,7 @@ export function ControlPanel({
   ];
 
   return (
-    <div className="bg-card rounded-lg border border-border shadow-sm p-3">
+    <div className="section-frame module bg-card">
       <h2 className="text-sm font-semibold text-foreground mb-2">Controls</h2>
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
         {/* Dataset Selector - Disabled, only MNIST supported */}

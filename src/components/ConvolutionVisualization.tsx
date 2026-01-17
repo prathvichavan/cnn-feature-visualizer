@@ -5,7 +5,7 @@ interface ConvolutionVisualizationProps {
   currentStep: ConvolutionStep | null;
   convStep: number;
   totalSteps: number;
-  phase: 'convolution' | 'pooling';
+  phase: 'convolution' | 'activation' | 'pooling' | 'flatten' | 'dense';
   isInteractive?: boolean; // True when showing user-selected cell
 }
 
@@ -18,7 +18,7 @@ export function ConvolutionVisualization({
   isInteractive = false,
 }: ConvolutionVisualizationProps) {
   return (
-    <div className={`bg-card rounded-lg border shadow-sm p-2 ${isInteractive ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-border'}`}>
+    <div className={`section-frame module ${isInteractive ? 'module--active' : ''} bg-card`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-foreground">Convolution Operation</h3>
@@ -37,7 +37,7 @@ export function ConvolutionVisualization({
         {/* Input Window */}
         <div className="text-center">
           <h4 className="text-xs font-medium text-muted-foreground mb-2">Input (3×3)</h4>
-          <div className="inline-grid grid-cols-3 gap-1 bg-secondary p-1 rounded">
+          <div className="inline-grid grid-cols-3 gap-1 data-area rounded">
             {currentStep?.inputWindow.map((row, i) =>
               row.map((val, j) => {
                 const pixelVal = Math.round(val);
@@ -69,7 +69,7 @@ export function ConvolutionVisualization({
         {/* Filter/Kernel */}
         <div className="text-center">
           <h4 className="text-xs font-medium text-muted-foreground mb-2">Filter</h4>
-          <div className="inline-grid grid-cols-3 gap-1 bg-secondary p-1 rounded">
+          <div className="inline-grid grid-cols-3 gap-1 data-area rounded">
             {filter.map((row, i) =>
               row.map((val, j) => {
                 return (
@@ -143,7 +143,7 @@ export function ConvolutionVisualization({
 
       {/* Sum Result */}
       <div className="mt-2 text-center">
-        <div className="inline-flex items-center gap-2 bg-secondary px-3 py-1 rounded">
+      <div className="inline-flex items-center gap-2 data-area px-3 py-1 rounded">
           <span className="text-xs font-medium text-muted-foreground">Sum:</span>
           <span className={`text-sm font-bold font-mono ${
             currentStep?.sum !== undefined

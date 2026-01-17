@@ -12,7 +12,7 @@ interface ConvolutionHighlight {
 interface InputImageGridProps {
   image: number[][];
   currentStep: ConvolutionStep | null;
-  phase: 'convolution' | 'pooling';
+  phase: 'convolution' | 'activation' | 'pooling' | 'flatten' | 'dense';
   highlightRegion?: { row: number; col: number } | null;
   convolutionHighlight?: ConvolutionHighlight | null; // Advanced highlight with dominant cell
   // NEW: Padding support
@@ -113,7 +113,7 @@ export function InputImageGrid({
   const cellSize = paddedInputSize <= 28 ? 14 : paddedInputSize <= 30 ? 12 : 11;
 
   return (
-    <div className="bg-card rounded-lg border border-border shadow-sm p-2">
+    <div className="section-frame module bg-card">
       <h3 className="text-sm font-semibold text-foreground mb-1">
         Input Image ({paddedInputSize}×{paddedInputSize})
         {padding > 0 && (
@@ -129,7 +129,7 @@ export function InputImageGrid({
       
       <div className="flex justify-center overflow-auto">
         <div 
-          className="inline-grid bg-border"
+          className="inline-grid data-area"
           style={{ 
             gridTemplateColumns: `repeat(${paddedInputSize}, ${cellSize}px)`,
             gap: '1px',
@@ -167,22 +167,22 @@ export function InputImageGrid({
                 };
               }
 
-              // If this is the DOMINANT contributing cell, highlight prominently
+              // If this is the DOMINANT contributing cell, use the single accent for emphasis
               if (isDominant) {
                 cellStyle = {
                   ...cellStyle,
-                  backgroundColor: '#FFEB3B', // Bright yellow
-                  color: '#000000',
-                  border: '2px solid #E65100', // Orange border
+                  backgroundColor: 'hsl(var(--secondary))',
+                  color: 'hsl(var(--accent-foreground))',
+                  border: `2px solid hsl(var(--accent))`,
                   fontWeight: 800,
                 };
               } else if (isHighlighted) {
-                // Part of 3x3 window - show with yellow tint overlay
+                // Part of 3x3 window - subtle accent overlay
                 cellStyle = {
                   ...cellStyle,
-                  backgroundColor: isPadding ? 'rgba(255, 235, 59, 0.5)' : 'rgba(255, 235, 59, 0.7)', // Yellow overlay
+                  backgroundColor: isPadding ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.08)',
                   color: '#000000',
-                  border: '1px solid #FFC107',
+                  border: `1px solid hsl(var(--accent) / 0.6)`,
                   fontWeight: 700,
                 };
               }

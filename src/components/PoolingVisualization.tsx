@@ -149,20 +149,8 @@ export function PoolingVisualization({
 
   // Get the appropriate highlight style based on pooling type
   const getHighlightStyle = (isHighlighted: boolean): string => {
-    if (!isHighlighted) return 'bg-muted text-muted-foreground';
-    
-    switch (poolingType) {
-      case 'max':
-        return 'bg-yellow-400 text-black ring-2 ring-yellow-600 scale-110 font-bold';
-      case 'min':
-        return 'bg-blue-400 text-black border-2 border-dashed border-blue-700 scale-110 font-bold';
-      case 'average':
-        return 'bg-green-300 text-black ring-1 ring-green-600 font-semibold';
-      case 'globalAverage':
-        return 'bg-purple-300 text-black ring-1 ring-purple-600 font-semibold';
-      default:
-        return 'bg-yellow-400 text-black';
-    }
+    // Keep highlights subtle and use the single accent color for active highlights
+    return isHighlighted ? 'accent-text accent-border font-semibold' : 'bg-muted text-muted-foreground';
   };
 
   // Get the result value based on pooling type
@@ -211,7 +199,7 @@ export function PoolingVisualization({
   const canRunPooling = isConvolutionComplete && phase === 'pooling';
 
   return (
-    <div className={`bg-card rounded-lg border shadow-sm p-2 ${isInteractive ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-border'}`}>
+    <div className={`section-frame module bg-card ${isInteractive ? 'module--active' : ''}`}>
       {/* Header with pooling type selector and status */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -234,14 +222,14 @@ export function PoolingVisualization({
 
       {/* Start Pooling Button (shown when convolution is complete but pooling hasn't started) */}
       {isConvolutionComplete && phase !== 'pooling' && poolStep === 0 && (
-        <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
+        <div className="mb-3 p-2 bg-secondary/50 rounded-lg border border-border">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-green-700">Pooling can be applied on raw or activated feature map.</p>
+            <p className="text-xs text-muted-foreground">Pooling can be applied on raw or activated feature map.</p>
             <Button
               onClick={onStartPooling}
               variant="default"
               size="sm"
-              className="h-7 px-3 text-xs flex items-center gap-1 bg-green-500 hover:bg-green-600"
+              className="h-7 px-3 text-xs flex items-center gap-1"
               title="Start pooling phase"
             >
               <Play className="w-3 h-3" />

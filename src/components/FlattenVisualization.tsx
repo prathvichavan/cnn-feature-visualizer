@@ -229,16 +229,16 @@ export function FlattenVisualization({
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+    <div className="section-frame module bg-card overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3 flex items-center justify-between">
+      <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-white font-semibold">Flatten Layer</h3>
+          <h3 className="text-sm font-semibold text-foreground">Flatten Layer</h3>
           <span className={`px-2 py-0.5 text-xs font-medium rounded border ${getStatusBadgeStyle()}`}>
             {status === 'waiting' ? 'Waiting' : status === 'running' ? 'Running' : 'Completed'}
           </span>
         </div>
-        <div className="text-white/80 text-sm">
+        <div className="text-sm text-muted-foreground">
           {completedCells} / {totalCells} values
         </div>
       </div>

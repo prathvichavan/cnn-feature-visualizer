@@ -214,9 +214,9 @@ export function DenseLayerVisualization({
   }, [showTopK, inputSize, topK, topInfluentialInputs]);
 
   return (
-    <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+    <div className="section-frame module bg-card overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-600 to-amber-600 px-4 py-3 flex items-center justify-between">
+      <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="text-white font-semibold">Fully Connected (Dense) Layer</h3>
           <span className={`px-2 py-0.5 text-xs font-medium rounded border ${getStatusBadgeStyle()}`}>
@@ -224,8 +224,8 @@ export function DenseLayerVisualization({
           </span>
           {/* Prediction badge */}
           {isDenseComplete && denseActivationType === 'softmax' && predictedNeuron !== null && (
-            <span className="px-2 py-0.5 text-xs font-medium rounded bg-green-500 text-white flex items-center gap-1">
-              <Trophy className="w-3 h-3" />
+            <span className="px-2 py-0.5 text-xs font-medium rounded bg-secondary accent-text flex items-center gap-1 border border-border">
+              <Trophy className="w-3 h-3 text-muted-foreground" />
               Predicted: N{predictedNeuron + 1}
             </span>
           )}

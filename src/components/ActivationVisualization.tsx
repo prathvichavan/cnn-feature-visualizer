@@ -176,7 +176,7 @@ export function ActivationVisualization({
   const canRunActivation = isConvolutionComplete && phase === 'activation';
 
   return (
-    <div className="bg-card rounded-lg border border-border shadow-sm p-3">
+    <div className={`section-frame module bg-card`}>
       {/* Header with Status and Controls */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -259,10 +259,7 @@ export function ActivationVisualization({
               onClick={() => onActivationTypeChange(type)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                 activationType === type
-                  ? type === 'none' ? 'bg-gray-500 text-white shadow-md' :
-                    type === 'relu' ? 'bg-orange-500 text-white shadow-md' :
-                    type === 'sigmoid' ? 'bg-teal-500 text-white shadow-md' :
-                    'bg-purple-500 text-white shadow-md'
+                  ? 'accent-text accent-border ring-1 ring-accent/10 bg-secondary'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
@@ -293,7 +290,7 @@ export function ActivationVisualization({
         </h4>
         <div className="flex justify-center">
           <div 
-            className="inline-grid bg-border"
+            className="inline-grid data-area"
             style={{ 
               gridTemplateColumns: `repeat(${size}, 18px)`,
               gap: '1px',
@@ -350,7 +347,7 @@ export function ActivationVisualization({
             onClick={() => onPoolingSourceChange('raw')}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
               poolingSource === 'raw'
-                ? 'bg-blue-500 text-white shadow-md'
+                ? 'accent-text accent-border ring-1 ring-accent/8 bg-secondary'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
@@ -360,7 +357,7 @@ export function ActivationVisualization({
             onClick={() => onPoolingSourceChange('activated')}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
               poolingSource === 'activated'
-                ? 'bg-green-500 text-white shadow-md'
+                ? 'accent-text accent-border ring-1 ring-accent/8 bg-secondary'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >

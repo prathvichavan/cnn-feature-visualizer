@@ -68,7 +68,7 @@ export function ExplanationPanel({
   const { icon, title, description, step } = getExplanation();
 
   return (
-    <div className="bg-card rounded-lg border border-border shadow-sm p-2">
+    <div className="section-frame module bg-card">
       <div className="flex items-start gap-2">
         <div className="p-1 bg-secondary rounded shrink-0">
           {icon}
@@ -79,9 +79,7 @@ export function ExplanationPanel({
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
               isComplete 
                 ? 'bg-accent/20 text-accent' 
-                : phase === 'convolution'
-                  ? 'bg-primary/20 text-primary'
-                  : 'bg-accent/20 text-accent'
+                : 'bg-muted text-muted-foreground'
             }`}>
               {step}
             </span>
