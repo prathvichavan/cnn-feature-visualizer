@@ -157,54 +157,8 @@ export default function ActivationPage() {
           </div>
         </div>
 
-        {/* Activation Functions Comparison */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-amber-600" />
-            Activation Functions Comparison
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-50 rounded-xl p-4">
-              <h4 className="font-semibold text-slate-700 mb-2">None (Linear)</h4>
-              <p className="text-xs text-slate-600 mb-2">f(x) = x</p>
-              <div className="h-16 bg-white rounded border border-slate-200 flex items-center justify-center">
-                <div className="w-full h-0.5 bg-slate-400 mx-4 transform -rotate-45 origin-center"></div>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">No transformation applied</p>
-            </div>
-
-            <div className="bg-green-50 rounded-xl p-4 ring-2 ring-green-400">
-              <h4 className="font-semibold text-green-700 mb-2">ReLU ⭐</h4>
-              <p className="text-xs text-green-600 mb-2">f(x) = max(0, x)</p>
-              <div className="h-16 bg-white rounded border border-green-200 flex items-center justify-center relative overflow-hidden">
-                <div className="absolute left-0 w-1/2 h-0.5 bg-green-400 top-1/2"></div>
-                <div className="absolute right-0 w-1/2 h-0.5 bg-green-600 transform -rotate-45 origin-left" style={{top: '50%', left: '50%'}}></div>
-              </div>
-              <p className="text-xs text-green-600 mt-2">Most popular choice</p>
-            </div>
-
-            <div className="bg-purple-50 rounded-xl p-4">
-              <h4 className="font-semibold text-purple-700 mb-2">Sigmoid</h4>
-              <p className="text-xs text-purple-600 mb-2">f(x) = 1/(1+e⁻ˣ)</p>
-              <div className="h-16 bg-white rounded border border-purple-200 flex items-center justify-center">
-                <div className="text-2xl text-purple-500">∿</div>
-              </div>
-              <p className="text-xs text-purple-600 mt-2">Output: 0 to 1</p>
-            </div>
-
-            <div className="bg-pink-50 rounded-xl p-4">
-              <h4 className="font-semibold text-pink-700 mb-2">Softmax</h4>
-              <p className="text-xs text-pink-600 mb-2">Probabilities sum to 1</p>
-              <div className="h-16 bg-white rounded border border-pink-200 flex items-center justify-center gap-1">
-                <div className="w-2 h-8 bg-pink-300 rounded"></div>
-                <div className="w-2 h-12 bg-pink-500 rounded"></div>
-                <div className="w-2 h-6 bg-pink-300 rounded"></div>
-                <div className="w-2 h-4 bg-pink-200 rounded"></div>
-              </div>
-              <p className="text-xs text-pink-600 mt-2">Used in output layer</p>
-            </div>
-          </div>
-        </div>
+        {/* Activation Functions Comparison (hidden) */}
+        {/* <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8"> ... </div> */}
 
         {/* Current Selection Info */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-center mb-6">
@@ -240,33 +194,89 @@ export default function ActivationPage() {
           />
         </div>
 
-        {/* Activation Visualization */}
-        <div className="mb-8">
-          <ActivationVisualization
-            featureMap={displayFeatureMap}
-            activatedMap={displayedActivationMap.length > 0
-              ? displayedActivationMap
-              : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
-            size={convOutputSize}
-            activationType={activationType}
-            onActivationTypeChange={setActivationType}
-            poolingSource={poolingSource}
-            onPoolingSourceChange={setPoolingSource}
-            phase={phase}
-            onStep={stepActivation}
-            onTogglePlay={toggleActivationPlay}
-            onReset={resetActivation}
-            isPlaying={isActivationPlaying}
-            isActivationComplete={isActivationComplete}
-            activationStep={activationStep}
-            totalActivationSteps={totalActivationSteps}
-            status={activationStatus}
-            isConvolutionComplete={isConvolutionComplete}
-            onStartActivation={startActivation}
-            onActivatedCellHover={(row, col) => setActivationHighlight({ row, col })}
-            onActivatedCellLeave={() => setActivationHighlight(null)}
-            stride={stride}
-          />
+        {/* Activation Pipeline: Input and Output Only */}
+        {/* Input and Activation Output Side by Side Layout */}
+        <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left: Input to Activation */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="mb-2 font-semibold text-orange-700">Input to Activation (Output of Convolution)</div>
+            <FeatureMapDisplay
+              featureMap={displayFeatureMap}
+              size={convOutputSize}
+              poolingHighlight={null}
+              activationHighlight={activationHighlight}
+            />
+          </div>
+          {/* Right: Activation Function and Output */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <ActivationVisualization
+              featureMap={displayFeatureMap}
+              activatedMap={displayedActivationMap.length > 0
+                ? displayedActivationMap
+                : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
+              size={convOutputSize}
+              activationType={activationType}
+              onActivationTypeChange={setActivationType}
+              poolingSource={"activated"}
+              onPoolingSourceChange={() => {}}
+              phase={phase}
+              onStep={stepActivation}
+              onTogglePlay={toggleActivationPlay}
+              onReset={resetActivation}
+              isPlaying={isActivationPlaying}
+              isActivationComplete={isActivationComplete}
+              activationStep={activationStep}
+              totalActivationSteps={totalActivationSteps}
+              status={activationStatus}
+              isConvolutionComplete={isConvolutionComplete}
+              onStartActivation={startActivation}
+              onActivatedCellHover={(row, col) => setActivationHighlight({ row, col })}
+              onActivatedCellLeave={() => setActivationHighlight(null)}
+              stride={stride}
+            />
+          </div>
+        </div>
+
+        {/* Activation Controls and Function Selector (Duplicate Section Hidden) */}
+        {false && (
+          <div className="mb-8">
+            <ActivationVisualization
+              featureMap={displayFeatureMap}
+              activatedMap={displayedActivationMap.length > 0
+                ? displayedActivationMap
+                : Array(convOutputSize).fill(null).map(() => Array(convOutputSize).fill(null))}
+              size={convOutputSize}
+              activationType={activationType}
+              onActivationTypeChange={setActivationType}
+              poolingSource={"activated"}
+              onPoolingSourceChange={() => {}}
+              phase={phase}
+              onStep={stepActivation}
+              onTogglePlay={toggleActivationPlay}
+              onReset={resetActivation}
+              isPlaying={isActivationPlaying}
+              isActivationComplete={isActivationComplete}
+              activationStep={activationStep}
+              totalActivationSteps={totalActivationSteps}
+              status={activationStatus}
+              isConvolutionComplete={isConvolutionComplete}
+              onStartActivation={startActivation}
+              onActivatedCellHover={(row, col) => setActivationHighlight({ row, col })}
+              onActivatedCellLeave={() => setActivationHighlight(null)}
+              stride={stride}
+            />
+          </div>
+        )}
+
+        {/* Proceed to Pooling Navigation */}
+        <div className="flex justify-end mb-8">
+          <Link
+            to="/pooling"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg font-medium hover:shadow-lg transition-all"
+          >
+            Proceed to Pooling
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
         {/* ReLU Deep Dive */}

@@ -34,5 +34,34 @@
     </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <script>
+      (function() {
+        emailjs.init('S_Oc-taDWdGQ03c1l');
+        var form = document.getElementById('contact-form');
+        var submitBtn = document.getElementById('contact-submit');
+        if(form && submitBtn) {
+          form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            var originalText = submitBtn.innerHTML;
+            emailjs.sendForm('service_5qwc7dd', 'template_ztqbj0m', form)
+              .then(function() {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Message Sent!';
+                setTimeout(function() {
+                  submitBtn.innerHTML = originalText;
+                }, 2000);
+                form.reset();
+                alert('Your message was sent successfully.');
+              }, function(error) {
+                submitBtn.disabled = false;
+                alert('Failed to send message. Please try again.');
+                console.error('EmailJS error:', error);
+              });
+          });
+        }
+      })();
+    </script>
   </body>
 </html>

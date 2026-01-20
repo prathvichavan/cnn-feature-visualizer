@@ -83,34 +83,37 @@ export default function HomePage() {
   }, []);
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 w-full overflow-x-hidden">
         {/* Hero Section - Technical */}
-        <section className="text-left py-8 md:py-10">
-          <h1 className="text-2xl md:text-3xl font-medium text-slate-900 mb-2">
-            CNN Feature Extraction Visualizer
-          </h1>
-          <p className="text-sm text-slate-600 mb-6 max-w-3xl">
-            Technical, step-by-step visualization of convolution, activation, pooling, flattening and dense layers. Intended for teaching and lab use.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              to="/single-page"
-              className="px-4 py-2 border border-slate-300 text-sm text-slate-800 bg-white rounded-sm"
-            >
-              View Full Pipeline
-            </Link>
-            <Link
-              to="/convolution"
-              className="px-4 py-2 border border-slate-300 text-sm text-slate-800 bg-white rounded-sm"
-            >
-              Start Step-by-Step
-            </Link>
+        <section className="flex flex-col items-center justify-center text-center py-5 md:py-8 w-full mt-1">
+          <div className="relative w-full max-w-6xl mx-auto rounded-3xl border border-slate-200 shadow-lg px-3 sm:px-6 md:px-10 py-6 md:py-10 min-h-[220px] md:min-h-[260px] bg-gradient-to-br from-slate-50 via-indigo-50 to-violet-50 overflow-hidden">
+            {/* Subtle blurred geometric shape (circle/blob) */}
+            <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-40 pointer-events-none select-none" aria-hidden="true"></div>
+            <h1 className="text-2xl md:text-4xl font-semibold text-slate-900 mb-3 md:mb-4 z-10 relative">
+              CNN Feature Extraction Visualizer
+            </h1>
+            <p className="text-base md:text-lg text-slate-600 mb-5 md:mb-7 max-w-2xl mx-auto z-10 relative">
+              Technical, step-by-step visualization of convolution, activation, pooling, flattening and dense layers. Intended for teaching and lab use.
+            </p>
+            <div className="flex flex-col md:flex-row gap-2 md:gap-3 w-full max-w-xs md:max-w-none justify-center items-center md:items-stretch z-10 relative">
+              <Link
+                to="/single-page"
+                className="px-5 py-2.5 text-sm font-semibold rounded-md bg-indigo-600 text-white shadow-sm border border-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 w-full xs:w-auto text-center transition-colors"
+              >
+                View Full Pipeline
+              </Link>
+              <Link
+                to="/convolution"
+                className="px-5 py-2.5 text-sm font-semibold rounded-md border border-indigo-600 text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-200 w-full xs:w-auto text-center transition-colors"
+              >
+                Start Step-by-Step
+              </Link>
+            </div>
           </div>
         </section>
 
         {/* Featured: Single Page View Card (Technical) */}
-        <section className="py-6">
+        <section className="py-4">
           <Link to="/single-page" className="block border border-slate-200 bg-white p-4 rounded-sm">
             <div className="flex items-center gap-4">
               <div className="p-2 bg-slate-100 rounded-sm">
@@ -125,32 +128,35 @@ export default function HomePage() {
         </section>
 
         {/* Learning Cards */}
-        <section className="py-8">
-          <h2 className="text-xl font-medium text-center text-slate-800 mb-4">
+        <div className="w-full flex justify-center my-5">
+          <div className="h-px w-full max-w-5xl bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+        </div>
+        <section className="py-5 md:py-8">
+          <h2 className="text-2xl font-semibold text-center text-slate-800 mb-3 tracking-tight">
             Module Topics
           </h2>
-          <p className="text-center text-slate-600 mb-6 max-w-2xl mx-auto">
+          <p className="text-center text-slate-600 mb-4 max-w-2xl mx-auto">
             Interactive modules for each pipeline stage.
           </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
             {pageCards.filter(card => !card.featured).map((card) => {
               const Icon = card.icon;
               return (
                 <Link
                   key={card.title}
                   to={card.link}
-                  className="group relative bg-white rounded-sm transition-colors border border-slate-200 p-4 h-full"
+                  className="group relative bg-slate-50 rounded-2xl border border-slate-200 p-3 flex flex-col h-full min-h-[140px] shadow-sm hover:shadow-lg hover:border-indigo-400 transition-all duration-200"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="p-2 bg-slate-100 rounded-sm">
-                      <Icon className="w-5 h-5 text-slate-700" />
+                  <div className="flex items-start gap-2 mb-1.5">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-cyan-100">
+                      <Icon className="w-5 h-5 text-indigo-600" />
                     </div>
-                    <div>
-                      <h3 className="text-md font-medium text-slate-900 mb-1">{card.title}</h3>
+                    <div className="flex-1">
+                      <h3 className="text-base font-semibold text-slate-900 mb-0.5">{card.title}</h3>
                       <p className="text-sm text-slate-600">{card.description}</p>
                     </div>
                   </div>
+                  {/* ...existing code for card content if any... */}
                 </Link>
               );
             })}

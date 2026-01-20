@@ -251,27 +251,33 @@ export default function ConvolutionPage() {
           />
         </div>
 
-        {/* Main Visualization Grid */}
+        {/* Main Visualization Grid with Pipeline Labels */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <InputImageGrid
-            image={inputImage}
-            currentStep={currentConvStep}
-            phase={phase}
-            highlightRegion={highlightInputRegion}
-            convolutionHighlight={convolutionHighlight}
-            padding={padding}
-            stride={stride}
-            paddedInputSize={paddedInputSize}
-            originalInputSize={originalInputSize}
-          />
-          <FeatureMapDisplay
-            featureMap={displayFeatureMap}
-            size={convOutputSize}
-            onCellHover={handleFeatureMapCellHover}
-            onCellLeave={clearConvolutionHighlight}
-            poolingHighlight={null}
-            activationHighlight={null}
-          />
+          <div>
+            <div className="mb-2 font-semibold text-slate-700">Input Image</div>
+            <InputImageGrid
+              image={inputImage}
+              currentStep={currentConvStep}
+              phase={phase}
+              highlightRegion={highlightInputRegion}
+              convolutionHighlight={convolutionHighlight}
+              padding={padding}
+              stride={stride}
+              paddedInputSize={paddedInputSize}
+              originalInputSize={originalInputSize}
+            />
+          </div>
+          <div>
+            <div className="mb-2 font-semibold text-orange-700">Output of Convolution (Input to Activation)</div>
+            <FeatureMapDisplay
+              featureMap={displayFeatureMap}
+              size={convOutputSize}
+              onCellHover={handleFeatureMapCellHover}
+              onCellLeave={clearConvolutionHighlight}
+              poolingHighlight={null}
+              activationHighlight={null}
+            />
+          </div>
         </div>
 
         {/* Formula and Tips */}

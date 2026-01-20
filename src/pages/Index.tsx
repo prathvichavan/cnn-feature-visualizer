@@ -142,6 +142,7 @@ const Index = () => {
     row: number;
     col: number;
     inputWindow: number[][];
+    filterWindow: number[][];
     multiplications: number[][];
     sum: number;
   } | null>(null);
@@ -192,6 +193,7 @@ const Index = () => {
       row: fmRow,
       col: fmCol,
       inputWindow,
+      filterWindow: filter,
       multiplications,
       sum: Math.round(sum),
     });
@@ -618,7 +620,7 @@ const Index = () => {
 
         {/* Explanation Panel */}
         <ExplanationPanel
-          phase={phase}
+          phase={phase === 'convolution' ? 'convolution' : 'pooling'}
           convStep={convStep}
           poolStep={poolStep}
           isComplete={isComplete}

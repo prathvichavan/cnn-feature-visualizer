@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FeatureMapDisplay } from '@/components/FeatureMapDisplay';
 import { Layout } from '@/components/layout/Layout';
 import { ControlPanel } from '@/components/ControlPanel';
 import { PoolingVisualization } from '@/components/PoolingVisualization';
@@ -356,30 +357,61 @@ export default function PoolingPage() {
           />
         </div>
 
-        {/* Pooling Visualization */}
+        {/* Activation Output as Input to Pooling - NEW SECTION */}
         <div className="mb-8">
-          <PoolingVisualization
-            currentStep={selectedPoolStep || currentPoolStep}
-            pooledMap={displayPooledMap}
-            poolStep={selectedPoolStep ? (selectedPoolStep.row * poolOutputSize + selectedPoolStep.col + 1) : poolStep}
-            totalSteps={totalPoolSteps}
-            size={poolOutputSize}
-            phase={phase}
-            poolingType={poolingType}
-            onPoolingTypeChange={setPoolingType}
-            onStep={stepPooling}
-            onTogglePlay={togglePoolingPlay}
-            onReset={resetPooling}
-            isPlaying={isPoolingPlaying}
-            isPoolingComplete={isPoolingComplete}
-            onPooledCellHover={handlePooledCellSelect}
-            onPooledCellLeave={clearPoolingHighlight}
-            selectedPooledCell={poolingHighlight ? { row: poolingHighlight.pooledRow, col: poolingHighlight.pooledCol } : null}
-            isInteractive={!!selectedPoolStep}
-            status={poolingStatus}
-            isConvolutionComplete={isConvolutionComplete}
-            onStartPooling={startPooling}
-          />
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Left: Activation Output (Input to Pooling) */}
+            <div className="lg:w-2/5 w-full">
+              <div className="section-frame module bg-card h-full flex flex-col">
+                <h3 className="text-base font-bold text-slate-800 mb-2">Input to Pooling Layer (Output of Activation)</h3>
+                <p className="text-xs text-muted-foreground mb-2">Red = positive, Blue = negative, Zero = gray</p>
+                <FeatureMapDisplay
+                  featureMap={displayedActivationMap}
+                  size={convOutputSize}
+                  poolingHighlight={poolingHighlight}
+                  onCellHover={(row, col) => {
+                    // When hovering a cell in activation, highlight the pooled cell if in a 2x2 window
+                    if (poolingType === 'globalAverage') return;
+                    // Find which pooled cell this activation cell maps to
+                    const pooledRow = Math.floor(row / 2);
+                    const pooledCol = Math.floor(col / 2);
+                    if (
+                      pooledRow >= 0 && pooledRow < poolOutputSize &&
+                      pooledCol >= 0 && pooledCol < poolOutputSize
+                    ) {
+                      handlePooledCellSelect(pooledRow, pooledCol);
+                    }
+                  }}
+                  onCellLeave={clearPoolingHighlight}
+                />
+              </div>
+            </div>
+            {/* Right: Pooling Visualization and controls */}
+            <div className="lg:w-3/5 w-full">
+              <PoolingVisualization
+                currentStep={selectedPoolStep || currentPoolStep}
+                pooledMap={displayPooledMap}
+                poolStep={selectedPoolStep ? (selectedPoolStep.row * poolOutputSize + selectedPoolStep.col + 1) : poolStep}
+                totalSteps={totalPoolSteps}
+                size={poolOutputSize}
+                phase={phase}
+                poolingType={poolingType}
+                onPoolingTypeChange={setPoolingType}
+                onStep={stepPooling}
+                onTogglePlay={togglePoolingPlay}
+                onReset={resetPooling}
+                isPlaying={isPoolingPlaying}
+                isPoolingComplete={isPoolingComplete}
+                onPooledCellHover={handlePooledCellSelect}
+                onPooledCellLeave={clearPoolingHighlight}
+                selectedPooledCell={poolingHighlight ? { row: poolingHighlight.pooledRow, col: poolingHighlight.pooledCol } : null}
+                isInteractive={!!selectedPoolStep}
+                status={poolingStatus}
+                isConvolutionComplete={isConvolutionComplete}
+                onStartPooling={startPooling}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Size Reduction Visualization */}

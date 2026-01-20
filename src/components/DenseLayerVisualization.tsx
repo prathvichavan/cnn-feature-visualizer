@@ -136,257 +136,138 @@ export function DenseLayerVisualization({
     return influences.sort((a, b) => b.absProduct - a.absProduct).slice(0, topK);
   }, [flattenedVector, currentWeights, topK]);
 
-  // Get color for values
+  // Get color for values (red=pos, blue=neg, gray=zero)
   const getValueColor = (val: number | null, maxAbs: number): { bg: string; text: string } => {
     if (val === null || val === undefined) {
       return { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' };
     }
-    
     if (val === 0) {
       return { bg: 'hsl(0, 0%, 95%)', text: '#000000' };
     }
-    
     const normalized = maxAbs > 0 ? val / maxAbs : 0;
-    
-    if (normalized >= 0) {
+    if (normalized > 0) {
+      // Positive: red
       const intensity = Math.min(1, Math.abs(normalized));
       const lightness = 95 - (intensity * 45);
       const textColor = lightness > 60 ? '#000000' : '#ffffff';
-      return { bg: `hsl(142, 71%, ${lightness}%)`, text: textColor }; // Green for positive
+      return { bg: `hsl(0, 84%, ${lightness}%)`, text: textColor };
     } else {
+      // Negative: blue
       const intensity = Math.min(1, Math.abs(normalized));
       const lightness = 95 - (intensity * 45);
       const textColor = lightness > 60 ? '#000000' : '#ffffff';
-      return { bg: `hsl(0, 84%, ${lightness}%)`, text: textColor }; // Red for negative
+      return { bg: `hsl(217, 91%, ${lightness}%)`, text: textColor };
     }
   };
 
-  // Format value for display
+  // Format value for display (2 decimals for grid)
   const formatValue = (val: number | null, decimals: number = 2): string => {
-    if (val === null || val === undefined) return '-';
-    if (val === 0) return '0';
-    if (Math.abs(val) >= 1000) {
-      return (val / 1000).toFixed(1) + 'k';
-    }
-    if (Math.abs(val) < 0.01) {
-      return val.toExponential(1);
-    }
+    if (val === null || val === undefined) return '';
+    if (val === 0) return '0.00';
     return val.toFixed(decimals);
+  };
+  // --- 2D Source Grid Renderer (used for both raw and activated feature maps) ---
+  const render2DSourceGrid = (map: number[][], label: string) => {
+    if (!map || !map.length) return null;
+    const size = map.length;
+    // Find min/max for color scaling
+    let min = 0, max = 0;
+    map.forEach(row => row.forEach(val => {
+      if (val !== null && val !== undefined) {
+        min = Math.min(min, val);
+        max = Math.max(max, val);
+      }
+    }));
+    const absMax = Math.max(Math.abs(min), Math.abs(max), 1);
+    return (
+      <div className="mb-4">
+        <h4 className="text-xs font-semibold text-foreground mb-1">{label}</h4>
+        <div className="inline-grid" style={{ gridTemplateColumns: `repeat(${size}, 1.5rem)`, gap: '2px', borderRadius: '0.5rem', overflow: 'hidden', background: 'hsl(var(--muted) / 0.2)' }}>
+          {map.map((row, rowIdx) =>
+            row.map((val, colIdx) => {
+              const { bg, text } = getValueColor(val, absMax);
+              return (
+                <div
+                  key={`${rowIdx}-${colIdx}`}
+                  style={{
+                    width: '1.5rem', height: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: bg, color: text, fontSize: '0.7rem', fontFamily: 'monospace', fontWeight: 600,
+                    border: '1px solid #e5e7eb', textAlign: 'center',
+                  }}
+                  title={`(${rowIdx},${colIdx}): ${formatValue(val, 2)}`}
+                >
+                  {formatValue(val, 2)}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
   };
 
   // Get status badge styling
   const getStatusBadgeStyle = () => {
     switch (status) {
-      case 'waiting':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'running':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'completed':
-        return 'bg-green-100 text-green-800 border-green-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  // Calculate max absolute values for color scaling
-  const maxAbsInput = useMemo(() => {
-    return Math.max(...flattenedVector.map(Math.abs), 1);
-  }, [flattenedVector]);
-
-  const maxAbsWeight = useMemo(() => {
-    return Math.max(...currentWeights.map(Math.abs), 1);
-  }, [currentWeights]);
-
-  const canStartDense = isFlattenComplete && phase !== 'dense';
-  const isInDensePhase = phase === 'dense';
-
-  // Handler for Start Dense
-  const handleStartDense = () => {
-    onStartDense();
-  };
-
-  // Determine which inputs to display
-  const displayIndices = useMemo(() => {
-    if (!showTopK || inputSize <= topK) {
-      return Array.from({ length: inputSize }, (_, i) => i);
-    }
-    return topInfluentialInputs.map(item => item.index);
-  }, [showTopK, inputSize, topK, topInfluentialInputs]);
-
-  return (
-    <div className="section-frame module bg-card overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-white font-semibold">Fully Connected (Dense) Layer</h3>
-          <span className={`px-2 py-0.5 text-xs font-medium rounded border ${getStatusBadgeStyle()}`}>
-            {status === 'waiting' ? 'Waiting' : status === 'running' ? 'Running' : 'Completed'}
-          </span>
-          {/* Prediction badge */}
-          {isDenseComplete && denseActivationType === 'softmax' && predictedNeuron !== null && (
-            <span className="px-2 py-0.5 text-xs font-medium rounded bg-secondary accent-text flex items-center gap-1 border border-border">
-              <Trophy className="w-3 h-3 text-muted-foreground" />
-              Predicted: N{predictedNeuron + 1}
-            </span>
-          )}
-        </div>
-        <div className="text-white/80 text-sm flex items-center gap-2">
-          <span>Viewing: Neuron {selectedNeuron + 1}</span>
-          {isInspectingNonPredicted && (
-            <span className="text-yellow-200 text-xs">(inspecting, not predicted)</span>
-          )}
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
-        {/* Controls Row 1: Layer Configuration */}
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-foreground whitespace-nowrap">
-              Output Neurons:
-            </label>
-            <select
-              value={denseLayerSize}
-              onChange={(e) => onDenseLayerSizeChange(Number(e.target.value))}
-              className="px-3 py-1.5 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-              disabled={isPlaying || isInDensePhase}
-            >
-              {[5, 10, 16, 32].map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-foreground whitespace-nowrap">
-              View Neuron:
-            </label>
-            <select
-              value={selectedNeuron}
-              onChange={(e) => onSelectedNeuronChange(Number(e.target.value))}
-              className="px-3 py-1.5 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-              disabled={isPlaying}
-            >
-              {Array.from({ length: denseLayerSize }, (_, i) => (
-                <option key={i} value={i}>
-                  Neuron {i + 1}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-foreground whitespace-nowrap">
-              Activation:
-            </label>
-            <select
-              value={denseActivationType}
-              onChange={(e) => onDenseActivationTypeChange(e.target.value as DenseActivationType)}
-              className="px-3 py-1.5 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-              disabled={isPlaying}
-            >
-              {(Object.keys(DENSE_ACTIVATION_LABELS) as DenseActivationType[]).map((type) => (
-                <option key={type} value={type}>
-                  {DENSE_ACTIVATION_LABELS[type]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Controls Row 2: Display Options */}
-        {inputSize > topK && (
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showTopK}
-                onChange={(e) => onShowTopKChange(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span className="text-sm text-muted-foreground">
-                Show Top-{topK} influential inputs only (input size: {inputSize})
-              </span>
-            </label>
-          </div>
-        )}
-
-        {/* Activation description */}
-        <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
-          {DENSE_ACTIVATION_DESCRIPTIONS[denseActivationType]}
-        </p>
-
-        {/* Controls Row 3: Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {!isInDensePhase ? (
-            <Button
-              size="sm"
-              onClick={handleStartDense}
-              disabled={!canStartDense}
-              className="gap-1"
-              variant={canStartDense ? "default" : "outline"}
-            >
-              <PlayCircle className="w-4 h-4" />
-              Start Dense
-            </Button>
-          ) : (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onStep}
-                disabled={isDenseComplete || isPlaying}
-                className="gap-1"
-              >
-                <StepForward className="w-4 h-4" />
-                Step
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onTogglePlay}
-                disabled={isDenseComplete}
-                className="gap-1"
-              >
-                {isPlaying ? (
-                  <>
-                    <Pause className="w-4 h-4" />
-                    Pause
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    Play
-                  </>
-                )}
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onReset}
-                className="gap-1"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Reset
-              </Button>
-            </>
-          )}
-
-          {/* Progress indicator */}
-          {isInDensePhase && (
-            <span className="text-sm text-muted-foreground ml-auto">
-              Step {denseStep} / {inputSize} {isNeuronComplete && '(+ bias)'}
-            </span>
-          )}
-        </div>
-
         {/* Main Visualization */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {/* LEFT: Input Vector (Flattened) */}
+          {/* LEFT: 2D Source (Activated Feature Map) */}
+          <div className="space-y-2">
+            {render2DSourceGrid(
+              (typeof window !== 'undefined' && (window as any).activatedFeatureMap2D) ? (window as any).activatedFeatureMap2D : (props as any).activatedFeatureMap2D || (props as any).activatedFeatureMap || [],
+              '2D Source (Activated Feature Map)'
+            )}
+          </div>
+          {/* CENTER: 2D Source (Feature Map - Raw) */}
+          <div className="space-y-2">
+            {render2DSourceGrid(
+              (typeof window !== 'undefined' && (window as any).rawFeatureMap2D) ? (window as any).rawFeatureMap2D : (props as any).rawFeatureMap2D || (props as any).rawFeatureMap || [],
+              '2D Source (Feature Map - Raw)'
+            )}
+          </div>
+          {/* RIGHT: Computation Result (unchanged) */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-foreground">
+              Computation
+            </h4>
+            {/* Current multiplication */}
+            <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+              <div className="text-xs text-muted-foreground">Current Step:</div>
+              {denseStep < inputSize && !isNeuronComplete ? (
+                <div className="font-mono text-sm">
+                  x[{denseStep}] × w[{denseStep}] = {formatValue(flattenedVector[denseStep], 2)} × {formatValue(currentWeights[denseStep], 2)}
+                  <div className="text-orange-600 font-semibold mt-1">
+                    = {formatValue(currentMultiplication, 4)}
+                  </div>
+                </div>
+              ) : isNeuronComplete ? (
+                <div className="font-mono text-sm text-green-600">
+                  All multiplications complete!
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  Click Step or Play to begin
+                </div>
+              )}
+            </div>
+            {/* Running sum */}
+            <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+              <div className="text-xs text-muted-foreground">Running Sum (Σ x_i × w_i):</div>
+              <div className="font-mono text-lg font-semibold text-blue-600">
+                {formatValue(runningSum, 4)}
+              </div>
+            </div>
+            {/* Final output */}
+            {isNeuronComplete && (
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3 space-y-2">
+                <div className="text-xs text-muted-foreground">Final Output (y = Σ + b):</div>
+                <div className="font-mono text-lg font-semibold">
+                  {formatValue(runningSum, 4)} + {formatValue(currentBias, 4)} = 
+                  <span className="text-orange-600 ml-2">
+                    {formatValue(neuronOutputs[selectedNeuron], 4)}
+                  </span>
+                </div>
+                {denseActivationType !== 'none' && activatedOutputs[selectedNeuron] !== null && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium text-foreground">
               Input Vector (x)

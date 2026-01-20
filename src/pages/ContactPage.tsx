@@ -152,7 +152,7 @@ export default function ContactPage() {
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form id="contact-form" className="space-y-4">
                   {/* Name */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -161,8 +161,7 @@ export default function ContactPage() {
                     </label>
                     <input
                       type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      name="name"
                       required
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                       placeholder="John Doe"
@@ -177,8 +176,7 @@ export default function ContactPage() {
                     </label>
                     <input
                       type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      name="email"
                       required
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                       placeholder="john@example.com"
@@ -192,8 +190,7 @@ export default function ContactPage() {
                       Message
                     </label>
                     <textarea
-                      value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      name="message"
                       required
                       rows={5}
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all resize-none"
@@ -203,6 +200,7 @@ export default function ContactPage() {
 
                   {/* Submit Button */}
                   <button
+                    id="contact-submit"
                     type="submit"
                     className="w-full py-3 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
                   >
