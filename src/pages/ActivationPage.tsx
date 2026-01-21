@@ -158,7 +158,47 @@ export default function ActivationPage() {
         </div>
 
         {/* Activation Functions Comparison (hidden) */}
-        {/* <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8"> ... </div> */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+          <h2 className="text-xl font-bold mb-4 text-slate-800 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-amber-600" />
+            Activation Functions Comparison
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* ReLU Card */}
+            <div className="border rounded-xl p-4 flex flex-col items-center bg-gradient-to-br from-yellow-50 to-amber-50">
+              <div className="font-bold text-lg text-yellow-700 mb-2">ReLU</div>
+              <div className="text-sm text-slate-700 mb-2 text-center">f(x) = max(0, x)</div>
+              <div className="flex gap-1 mb-2">
+                <span className="bg-red-200 text-red-700 rounded px-2">-2</span>
+                <span className="bg-yellow-200 text-yellow-700 rounded px-2">0</span>
+                <span className="bg-green-200 text-green-700 rounded px-2">3</span>
+              </div>
+              <div className="text-xs text-slate-600 text-center">Negative values become 0, positive stay same.</div>
+            </div>
+            {/* Sigmoid Card */}
+            <div className="border rounded-xl p-4 flex flex-col items-center bg-gradient-to-br from-blue-50 to-indigo-50">
+              <div className="font-bold text-lg text-blue-700 mb-2">Sigmoid</div>
+              <div className="text-sm text-slate-700 mb-2 text-center">f(x) = 1 / (1 + e<sup>-x</sup>)</div>
+              <div className="flex gap-1 mb-2">
+                <span className="bg-blue-200 text-blue-700 rounded px-2">0.12</span>
+                <span className="bg-blue-300 text-blue-800 rounded px-2">0.50</span>
+                <span className="bg-blue-400 text-white rounded px-2">0.95</span>
+              </div>
+              <div className="text-xs text-slate-600 text-center">Squashes values between 0 and 1.</div>
+            </div>
+            {/* Softmax Card */}
+            <div className="border rounded-xl p-4 flex flex-col items-center bg-gradient-to-br from-purple-50 to-fuchsia-50">
+              <div className="font-bold text-lg text-purple-700 mb-2">Softmax</div>
+              <div className="text-sm text-slate-700 mb-2 text-center">f(x<sub>i</sub>) = e<sup>x<sub>i</sub></sup> / Σ e<sup>x<sub>j</sub></sup></div>
+              <div className="flex gap-1 mb-2">
+                <span className="bg-purple-200 text-purple-700 rounded px-2">0.05</span>
+                <span className="bg-purple-300 text-purple-800 rounded px-2">0.20</span>
+                <span className="bg-purple-400 text-white rounded px-2">0.75</span>
+              </div>
+              <div className="text-xs text-slate-600 text-center">Turns scores into probabilities (sum to 1).</div>
+            </div>
+          </div>
+        </div>
 
         {/* Current Selection Info */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-center mb-6">
